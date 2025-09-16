@@ -39,7 +39,17 @@ button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);colo
 .reactions{margin-top:4px;display:flex;gap:4px;}
 .react-btn{cursor:pointer;padding:2px 4px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);background:transparent;color:var(--muted);font-size:12px;}
 .send-area{display:flex;gap:6px;padding-top:6px;align-items:center;}
-textarea#messageInput{flex:1;min-height:36px;max-height:100px;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);background:#000;color:#fff;resize:none;}
+textarea#messageInput{
+  flex:1;
+  min-height:50px;   /* taller for typing */
+  max-height:150px;  /* more vertical space */
+  padding:10px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,0.05);
+  background:#000;
+  color:#fff;
+  resize:vertical;
+}
 #right .profile{display:flex;flex-direction:column;gap:4px;}
 .admin-tools{display:none;flex-direction:column;gap:6px;}
 .small-ghost{font-size:11px;color:var(--muted);}
@@ -98,7 +108,7 @@ textarea#messageInput{flex:1;min-height:36px;max-height:100px;padding:6px;border
     <div id="messages"></div>
 
     <div class="send-area">
-      <div class="compose">
+      <div class="compose" style="flex:1;">
         <textarea id="messageInput" placeholder="Write your message..."></textarea>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px">
@@ -111,7 +121,12 @@ textarea#messageInput{flex:1;min-height:36px;max-height:100px;padding:6px;border
   <div class="panel" id="right">
     <div class="profile">
       <div><strong id="profileName">Guest</strong> <span id="adminBadge"></span></div>
-      <div class="small">Stars: <span id="starCount">0</span></div>
+      <div class="small">
+        Stars: <span id="starCount">0</span>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" width="14" height="14" style="vertical-align:middle; margin-left:2px; color:#DFF41F;">
+          <path d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.782 1.402 8.175L12 18.897l-7.336 3.87 1.402-8.175L.132 9.21l8.2-1.192z"/>
+        </svg>
+      </div>
       <div class="small">UID: <span id="uid">—</span></div>
     </div>
 
