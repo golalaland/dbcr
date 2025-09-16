@@ -6,12 +6,11 @@
 <title>Xixi — Chatroom</title>
 <link rel="icon" href="data:," />
 <style>
-/* === XiXi Chatroom Colors & Font === */
 :root{
-  --bg:#000; /* dark black */
-  --card:#111; /* chat panel dark */
-  --muted:#aaa; /* light gray text */
-  --accent:#DFF41F; /* neon green highlight */
+  --bg:#000;
+  --card:#111;
+  --muted:#aaa;
+  --accent:#DFF41F;
   --glass: rgba(255,255,255,0.03);
   --scrollbar:#222;
 }
@@ -38,18 +37,31 @@ button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);colo
 .content{font-size:13px;color:#fff;white-space:pre-wrap;}
 .reactions{margin-top:4px;display:flex;gap:4px;}
 .react-btn{cursor:pointer;padding:2px 4px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);background:transparent;color:var(--muted);font-size:12px;}
-.send-area{display:flex;gap:6px;padding-top:6px;align-items:center;}
-textarea#messageInput{
-  flex:1;
-  min-height:50px;   /* taller for typing */
-  max-height:150px;  /* more vertical space */
-  padding:10px;
-  border-radius:12px;
-  border:1px solid rgba(255,255,255,0.05);
-  background:#000;
-  color:#fff;
-  resize:vertical;
+
+/* === Send area: YouTube-style full-width input === */
+.send-area{
+  display:flex;
+  gap:6px;
+  padding-top:6px;
+  align-items:center;
 }
+textarea#messageInput{
+  flex:1;                 /* full width */
+  min-height:36px;
+  max-height:100px;
+  padding:10px;
+  border-radius:20px;     /* pill-style */
+  border:1px solid rgba(255,255,255,0.05);
+  background:#111;
+  color:#fff;
+  resize:none;
+}
+.send-area button#sendBtn{
+  flex:0 0 auto;
+  padding:6px 16px;
+  border-radius:12px;
+}
+
 #right .profile{display:flex;flex-direction:column;gap:4px;}
 .admin-tools{display:none;flex-direction:column;gap:6px;}
 .small-ghost{font-size:11px;color:var(--muted);}
@@ -108,12 +120,8 @@ textarea#messageInput{
     <div id="messages"></div>
 
     <div class="send-area">
-      <div class="compose" style="flex:1;">
-        <textarea id="messageInput" placeholder="Write your message..."></textarea>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:4px">
-        <button id="sendBtn" class="btn">Send</button>
-      </div>
+      <textarea id="messageInput" placeholder="Write your message..."></textarea>
+      <button id="sendBtn" class="btn">Send</button>
     </div>
   </div>
 
@@ -144,9 +152,8 @@ textarea#messageInput{
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, doc, setDoc, addDoc, getDoc, query, orderBy, onSnapshot, serverTimestamp, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, addDoc, getDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* === Your Firebase config here === */
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
   authDomain: "YOUR_AUTH_DOMAIN",
@@ -160,7 +167,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// --- Predefined rooms ---
+// Predefined rooms
 const rooms = [
   "Money Talk 💸",
   "For Love of Music ♫",
@@ -183,21 +190,14 @@ rooms.forEach(roomName => {
 });
 
 let currentRoom = null;
-
 function selectRoom(name, btn) {
   currentRoom = name;
   document.getElementById("roomTitle").textContent = name;
   document.getElementById("roomSub").textContent = `Chatting in "${name}"`;
-
-  // Highlight active room
   document.querySelectorAll(".room-btn").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
-
-  loadMessages(name); // implement this to fetch messages from Firestore per room
+  // loadMessages(name); // implement your Firestore fetch here
 }
-
-// ======= Auth, Send Message & Message Loading Logic =======
-// Implement your existing Firebase chat logic here, keeping it tied to `currentRoom`
 </script>
 </body>
 </html>
