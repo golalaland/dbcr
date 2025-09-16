@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Firebase Auth Test</title>
+<style>
+  body { font-family: Arial; background: #000; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+  #auth-container { background: #111; padding: 20px; border-radius: 8px; }
+  input { display: block; margin: 10px 0; padding: 8px; border-radius: 4px; border: none; width: 250px; }
+  button { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; background: #ff4b2b; color: #fff; margin-right: 5px; }
+  #logout-btn { margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div id="auth-container">
+  <h2>Login / Signup</h2>
+  <input type="email" id="email" placeholder="Email">
+  <input type="password" id="password" placeholder="Password">
+  <div>
+    <button id="signup-btn">Sign Up</button>
+    <button id="login-btn">Login</button>
+  </div>
+  <p id="login-msg"></p>
+  <p id="user-info" class="hidden"></p>
+  <button id="logout-btn" class="hidden">Logout</button>
+</div>
+
+<script type="module">
+  // Firebase imports
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.6.2/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.6.2/firebase-auth.js";
+
+  // Your Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyDmj1SQvIqI_A83EivlJfDg2z-kyUYIyrM",
+    authDomain: "xixichatroomdb.firebaseapp.com",
+    projectId: "xixichatroomdb",
+    storageBucket: "xixichatroomdb.firebasestorage.app",
+    messagingSenderId: "727244293530",
+    appId: "1:727244293530:web:29559cbcc18b49831b2623"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  // Elements
+  const emailInput = document.getElementById("email");
+  const passwordInput = document.getElementById("password");
+  const signupBtn = document.getElementById("signup-btn");
+  const loginBtn = document.getElementById("login-btn");
+  const logoutBtn = document.getElementById("logout-btn");
+  const loginMsg = document.getElementById("login-msg");
+  const userInfo = document.getElementById("user-info");
+
+  // Signup
+  signupBtn.onclick = async () => {
+    loginMsg.textContent = "";
+    try {
+      const userCred = await createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
+      console.log("Signup successful:", userCred.user.uid);
+      loginMsg.textContent = "Signup successful!";
+    } catch (err) {
+      console.error("Signup error:", err.code, err.message);
+      loginMsg.textContent = err.message;
+    }
+  };
+
+  // Login
+  loginBtn.onclick = async () => {
+    loginMsg.textContent = "";
+    try {
+      const userCred = await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
+      console.log("Login successful:", userCred.user.uid);
+      loginMsg.textContent = "Login successful!";
+    } catch (err) {
+      console.error("Login error:", err.code, err.message);
+      loginMsg.textContent = err.message;
+    }
+  };
+
+  // Logout
+  logoutBtn.onclick = () => signOut(auth);
+
+  // Auth state listener
+  onAuthStateChanged(auth, user => {
+    if (user) {
+      emailInput.classList.add("hidden");
+      passwordInput.classList.add("hidden");
+      signupBtn.classList.add("hidden");
+      loginBtn.classList.add("hidden");
+      logoutBtn.classList.remove("hidden");
+      userInfo.classList.remove("hidden");
+      userInfo.textContent = `Logged in as: ${user.email}`;
+    } else {
+      emailInput.classList.remove("hidden");
+      passwordInput.classList.remove("hidden");
+      signupBtn.classList.remove("hidden");
+      loginBtn.classList.remove("hidden");
+      logoutBtn.classList.add("hidden");
+      userInfo.classList.add("hidden");
+      userInfo.textContent = "";
+    }
+  });
+</script>
+
+</body>
+</html>
