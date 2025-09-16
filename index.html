@@ -32,7 +32,7 @@ button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);colo
   height:100%;
   display:flex;
   flex-direction:column;
-  position: relative; /* necessary for sticky send bar */
+  position: relative;
 }
 .topbar{display:flex;justify-content:space-between;align-items:center;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.05);}
 #messages{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:6px;border-radius:8px;background:#000;}
@@ -43,7 +43,7 @@ button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);colo
 .reactions{margin-top:4px;display:flex;gap:4px;}
 .react-btn{cursor:pointer;padding:2px 4px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);background:transparent;color:var(--muted);font-size:12px;}
 
-/* === Send area: sticky YouTube-style full-width input === */
+/* Send area sticky YouTube-style input */
 .send-area{
   display:flex;
   gap:6px;
@@ -94,7 +94,7 @@ textarea#messageInput{
     <!-- Auth -->
     <div id="authBox" style="margin-top:12px">
       <div id="authForm">
-        <input type="text" id="authUsername" placeholder="@Username" style="margin-bottom:6px" />
+        <input type="text" id="authUsername" placeholder="Chat ID" style="margin-bottom:6px" />
         <input type="email" id="authEmail" placeholder="Email" />
         <input type="password" id="authPassword" placeholder="Password" style="margin-top:6px"/>
         <div class="controls-row">
@@ -159,10 +159,9 @@ textarea#messageInput{
   <div style="text-align:right;margin-top:6px"><button id="closeStar" class="ghost">Close</button></div>
 </div>
 
-<!-- Firebase SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, doc, setDoc, addDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -210,56 +209,34 @@ function selectRoom(name, btn) {
 // Signup
 signupBtn.addEventListener("click", async () => {
   const email = authEmail.value;
-  const password = authPassword.value;
-  const username = authUsername.value.trim().replace(/^@/, "");
-  if (!username) return alert("Please enter a username");
-  try {
-    const userCred = await createUserWithEmailAndPassword(auth, email, password);
-    const uid = userCred.user.uid;
-    await setDoc(doc(db, "users", uid), { username, email, stars:0 });
-    alert("Signup successful! Welcome, " + username);
-  } catch (err) { console.error(err); alert("Signup error: " + err.message); }
+  const pass = authPassword.value;
+  const chatId = authUsername.value.trim();
+  if(!chatId) return alert("Enter Chat ID");
+  await createUserWithEmailAndPassword(auth, email, pass);
+  // store Chat ID in Firestore
+  await setDoc(doc(db, "users", email), { chatId });
 });
 
 // Signin
 signinBtn.addEventListener("click", async () => {
   const email = authEmail.value;
-  const password = authPassword.value;
-  try { await signInWithEmailAndPassword(auth, email, password); }
-  catch (err) { console.error(err); alert("Sign in error: " + err.message); }
+  const pass = authPassword.value;
+  await signInWithEmailAndPassword(auth, email, pass);
 });
 
-// Track auth state
-onAuthStateChanged(auth, async user => {
-  if (user) {
-    const userDoc = await getDoc(doc(db, "users", user.uid));
-    const username = userDoc.exists() ? userDoc.data().username : "Guest";
-    document.getElementById("profileName").textContent = username;
-    document.getElementById("userInfoTop").textContent = username;
-    document.getElementById("authForm").style.display = "none";
-    document.getElementById("signoutBtn").style.display = "block";
+// Auth state
+onAuthStateChanged(auth, user => {
+  if(user) {
+    profileName.textContent = user.email.split("@")[0];
+    uid.textContent = user.uid;
+    authForm.style.display = "none";
+    signoutBtn.style.display = "block";
   } else {
-    document.getElementById("profileName").textContent = "Guest";
-    document.getElementById("userInfoTop").textContent = "";
-    document.getElementById("authForm").style.display = "block";
-    document.getElementById("signoutBtn").style.display = "none";
+    profileName.textContent = "Guest";
+    uid.textContent = "—";
+    authForm.style.display = "block";
+    signoutBtn.style.display = "none";
   }
-});
-
-// Send message
-sendBtn.addEventListener("click", async () => {
-  const msg = messageInput.value.trim();
-  if (!msg || !currentRoom) return;
-  const user = auth.currentUser;
-  if (!user) return alert("Sign in first!");
-  const userDoc = await getDoc(doc(db, "users", user.uid));
-  const username = userDoc.exists() ? userDoc.data().username : "Guest";
-  await addDoc(collection(db, "rooms", currentRoom, "messages"), {
-    content: msg,
-    sender: username,
-    timestamp: serverTimestamp()
-  });
-  messageInput.value = "";
 });
 </script>
 </body>
