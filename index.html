@@ -3,36 +3,60 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Firebase Auth Test</title>
+<title>Global Chatbox</title>
 <style>
-  body { font-family: Arial; background: #000; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-  #auth-container { background: #111; padding: 20px; border-radius: 8px; }
-  input { display: block; margin: 10px 0; padding: 8px; border-radius: 4px; border: none; width: 250px; }
-  button { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; background: #ff4b2b; color: #fff; margin-right: 5px; }
-  #logout-btn { margin-top: 10px; }
+  body { margin:0; font-family: Arial; background: #000; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
+  /* Login Modal */
+  #login-modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); display:flex; align-items:center; justify-content:center; flex-direction:column; z-index:10; }
+  #login-container { background:#111; padding:20px; border-radius:8px; width:300px; text-align:center; }
+  #login-container input { width:100%; margin:8px 0; padding:8px; border:none; border-radius:4px; }
+  #login-container button { padding:8px 12px; margin:5px; border:none; border-radius:4px; cursor:pointer; background:#ff4b2b; color:#fff; }
+  #login-msg { margin:5px; min-height:18px; font-size:0.9em; color:#f00; }
+  /* Chat */
+  #chat-container { display:flex; flex-direction:column; width:100%; max-width:500px; height:90vh; }
+  #stars-counter { margin:5px; text-align:right; font-weight:bold; }
+  #chat-feed { flex:1; overflow-y:auto; background:#111; padding:10px; border-radius:8px; margin:5px 0; }
+  .message { margin-bottom:8px; padding:5px; border-radius:4px; background:#222; }
+  .reactions button { background:none; border:none; cursor:pointer; margin-right:4px; font-size:1em; }
+  #chat-input { display:flex; gap:5px; margin:5px 0; }
+  #chat-input input { flex:1; padding:8px; border-radius:4px; border:none; }
+  #chat-input button { padding:8px 12px; border:none; border-radius:4px; cursor:pointer; background:#ff4b2b; color:#fff; }
+  #logout-btn { margin:5px; padding:8px 12px; border:none; border-radius:4px; cursor:pointer; background:#555; color:#fff; align-self:flex-end; }
 </style>
 </head>
 <body>
 
-<div id="auth-container">
-  <h2>Login / Signup</h2>
-  <input type="email" id="email" placeholder="Email">
-  <input type="password" id="password" placeholder="Password">
-  <div>
-    <button id="signup-btn">Sign Up</button>
-    <button id="login-btn">Login</button>
+<!-- Login / Signup Modal -->
+<div id="login-modal">
+  <div id="login-container">
+    <h2>Login / Signup</h2>
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="password" placeholder="Password">
+    <div>
+      <button id="signup-btn">Sign Up</button>
+      <button id="login-btn">Login</button>
+    </div>
+    <p id="login-msg"></p>
   </div>
-  <p id="login-msg"></p>
-  <p id="user-info" class="hidden"></p>
-  <button id="logout-btn" class="hidden">Logout</button>
+</div>
+
+<!-- Chat Container -->
+<div id="chat-container" class="hidden">
+  <div id="stars-counter">Stars: 0</div>
+  <div id="chat-feed"></div>
+  <div id="chat-input">
+    <input type="text" id="message" placeholder="Type a message...">
+    <button id="send-btn">Send</button>
+  </div>
+  <button id="logout-btn">Logout</button>
 </div>
 
 <script type="module">
-  // Firebase imports
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.6.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, updateDoc, increment, doc } from "https://www.gstatic.com/firebasejs/10.6.2/firebase-firestore.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.6.2/firebase-auth.js";
 
-  // Your Firebase config
+  // ---------------- Firebase Config ----------------
   const firebaseConfig = {
     apiKey: "AIzaSyDmj1SQvIqI_A83EivlJfDg2z-kyUYIyrM",
     authDomain: "xixichatroomdb.firebaseapp.com",
@@ -41,26 +65,37 @@
     messagingSenderId: "727244293530",
     appId: "1:727244293530:web:29559cbcc18b49831b2623"
   };
-
-  // Initialize Firebase
   const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
   const auth = getAuth(app);
 
-  // Elements
+  // ---------------- Elements ----------------
+  const loginModal = document.getElementById("login-modal");
   const emailInput = document.getElementById("email");
   const passwordInput = document.getElementById("password");
   const signupBtn = document.getElementById("signup-btn");
   const loginBtn = document.getElementById("login-btn");
-  const logoutBtn = document.getElementById("logout-btn");
   const loginMsg = document.getElementById("login-msg");
-  const userInfo = document.getElementById("user-info");
 
-  // Signup
+  const chatContainer = document.getElementById("chat-container");
+  const chatFeed = document.getElementById("chat-feed");
+  const messageInput = document.getElementById("message");
+  const sendBtn = document.getElementById("send-btn");
+  const starsCounter = document.getElementById("stars-counter");
+  const logoutBtn = document.getElementById("logout-btn");
+
+  let currentUser = null;
+  let rewardInterval = null;
+
+  // ---------------- Signup ----------------
   signupBtn.onclick = async () => {
     loginMsg.textContent = "";
     try {
       const userCred = await createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
-      console.log("Signup successful:", userCred.user.uid);
+      const uid = userCred.user.uid;
+      // Create user document
+      await addDoc(collection(db, "users"), { uid, email: emailInput.value, admin:false, stars:0 });
+      console.log("Signup successful:", uid);
       loginMsg.textContent = "Signup successful!";
     } catch (err) {
       console.error("Signup error:", err.code, err.message);
@@ -68,7 +103,7 @@
     }
   };
 
-  // Login
+  // ---------------- Login ----------------
   loginBtn.onclick = async () => {
     loginMsg.textContent = "";
     try {
@@ -81,30 +116,94 @@
     }
   };
 
-  // Logout
+  // ---------------- Logout ----------------
   logoutBtn.onclick = () => signOut(auth);
 
-  // Auth state listener
-  onAuthStateChanged(auth, user => {
+  // ---------------- Auth State ----------------
+  onAuthStateChanged(auth, async (user) => {
     if (user) {
-      emailInput.classList.add("hidden");
-      passwordInput.classList.add("hidden");
-      signupBtn.classList.add("hidden");
-      loginBtn.classList.add("hidden");
-      logoutBtn.classList.remove("hidden");
-      userInfo.classList.remove("hidden");
-      userInfo.textContent = `Logged in as: ${user.email}`;
+      currentUser = user;
+      loginModal.classList.add("hidden");
+      chatContainer.classList.remove("hidden");
+
+      // Load stars
+      const usersRef = collection(db,"users");
+      onSnapshot(usersRef, snapshot => {
+        snapshot.docs.forEach(docu => {
+          if(docu.data().uid === currentUser.uid){
+            starsCounter.textContent = `Stars: ${docu.data().stars}`;
+          }
+        });
+      });
+
+      // Start reward timer
+      startRewardTimer();
+
+      // Load chat
+      loadChat();
+
     } else {
-      emailInput.classList.remove("hidden");
-      passwordInput.classList.remove("hidden");
-      signupBtn.classList.remove("hidden");
-      loginBtn.classList.remove("hidden");
-      logoutBtn.classList.add("hidden");
-      userInfo.classList.add("hidden");
-      userInfo.textContent = "";
+      currentUser = null;
+      loginModal.classList.remove("hidden");
+      chatContainer.classList.add("hidden");
+      clearInterval(rewardInterval);
     }
   });
-</script>
 
+  // ---------------- Reward Timer ----------------
+  function startRewardTimer() {
+    rewardInterval = setInterval(async () => {
+      const usersRef = collection(db,"users");
+      const snapshot = await usersRef.get();
+      snapshot.docs.forEach(async docu=>{
+        if(docu.data().uid === currentUser.uid){
+          await updateDoc(doc(db,"users",docu.id), { stars: increment(1) });
+        }
+      });
+    }, 5*60*1000);
+  }
+
+  // ---------------- Load Chat ----------------
+  function loadChat() {
+    const messagesRef = collection(db,"global-messages");
+    const q = query(messagesRef, orderBy("timestamp","asc"));
+    onSnapshot(q, snapshot => {
+      chatFeed.innerHTML = "";
+      snapshot.docs.forEach(docu => {
+        const data = docu.data();
+        const msgDiv = document.createElement("div");
+        msgDiv.classList.add("message");
+        msgDiv.innerHTML = `<strong>${data.senderName}:</strong> ${data.text}`;
+        const reactionsDiv = document.createElement("div");
+        reactionsDiv.classList.add("reactions");
+        ["❤️","🔥","😂"].forEach(r => {
+          const btn = document.createElement("button");
+          btn.textContent = r;
+          btn.onclick = async () => {
+            const field = `reactions.${r}`;
+            await updateDoc(doc(db,"global-messages",docu.id), {[field]:increment(1)});
+          };
+          reactionsDiv.appendChild(btn);
+        });
+        msgDiv.appendChild(reactionsDiv);
+        chatFeed.appendChild(msgDiv);
+      });
+      chatFeed.scrollTop = chatFeed.scrollHeight;
+    });
+  }
+
+  // ---------------- Send Message ----------------
+  sendBtn.onclick = async () => {
+    const text = messageInput.value.trim();
+    if(!text) return;
+    messageInput.value = "";
+    await addDoc(collection(db,"global-messages"), {
+      text,
+      senderId: currentUser.uid,
+      senderName: currentUser.email.split("@")[0],
+      timestamp: new Date()
+    });
+  };
+</script>
 </body>
 </html>
