@@ -1,132 +1,141 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>XiXi Chat</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>XiXi Chat — Compact</title>
+<link rel="icon" href="data:," />
 <style>
-  :root {
-    --accent: #ff00aa;
-    --bg: #111;
-    --text: #fff;
-  }
-  * {box-sizing:border-box;margin:0;padding:0;font-family:sans-serif;}
-  body {background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;}
-  #chatContainer {display:flex;flex-direction:column;width:100%;max-width:500px;height:80vh;background:#000;border-radius:12px;overflow:hidden;}
-  #chatHeader {background:#111;height:60px;display:flex;justify-content:center;align-items:center;font-size:1.5em;font-weight:bold;color:var(--accent);}
-  #messages {flex:1;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
-  .msg {padding:8px 12px;background:#222;border-radius:8px;max-width:80%;}
-  .msg.me {background:var(--accent);color:#000;align-self:flex-end;}
-  #inputBar {display:flex;border-top:1px solid #333;}
-  #inputBar input {flex:1;padding:12px;background:#111;border:none;color:#fff;}
-  #inputBar button {padding:12px;background:var(--accent);border:none;color:#000;font-weight:bold;cursor:pointer;}
-  /* Auth Modal */
-  #authModal {position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;justify-content:center;align-items:center;z-index:10000;}
-  #authModal div {background:#111;padding:24px;border-radius:12px;width:300px;display:flex;flex-direction:column;gap:12px;}
-  #authModal input {padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:#000;color:#fff;}
-  #authModal button {padding:10px;background:var(--accent);border:none;color:#000;font-weight:bold;cursor:pointer;border-radius:8px;}
+:root{
+  --bg:#000000; 
+  --card:#111111; 
+  --muted:#9fb0c6; 
+  --accent:#DFF41F; 
+  --accent-dark:#A1C800;
+  --glass: rgba(255,255,255,0.03);
+}
+html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;color:#e6eef8;background:var(--bg);}
+.app{display:grid;grid-template-columns:1fr;gap:16px;padding:18px;box-sizing:border-box;height:100%;align-items:center;justify-items:center}
+.panel{background:var(--card);border-radius:12px;padding:18px;box-shadow:0 8px 30px rgba(0,0,0,.6);display:flex;flex-direction:column;min-width:300px;max-width:420px;width:100%;}
+.brand{font-weight:700;font-size:32px;text-align:center;color:var(--accent);}
+.small{font-size:13px;color:var(--muted);text-align:center;}
+#authBox{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;}
+input[type="email"], input[type="password"]{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:#fff}
+button.btn{background:var(--accent);color:#000;border:0;padding:10px 14px;border-radius:8px;cursor:pointer;font-weight:600}
+button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:10px;border-radius:8px;cursor:pointer}
+#messages{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px;border-radius:8px;margin-bottom:8px;max-height:300px;background:var(--bg);}
+.msg{padding:10px;border-radius:12px;background:var(--glass);max-width:72%;position:relative;color:#fff;}
+.msg.me{margin-left:auto;background:linear-gradient(180deg, rgba(223,244,31,0.06), rgba(223,244,31,0.03))}
+.send-area{display:flex;gap:8px;padding-top:8px;align-items:center}
+textarea#messageInput{flex:1;min-height:44px;max-height:120px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:#fff;resize:none}
 </style>
 </head>
 <body>
 
-<!-- CHAT CONTAINER -->
-<div id="chatContainer">
-  <div id="chatHeader">XiXi</div>
-  <div id="messages"></div>
-  <div id="inputBar">
-    <input type="text" id="messageInput" placeholder="Type a message...">
-    <button id="sendBtn">Send</button>
+<div class="app">
+  <div class="panel">
+    <div class="brand">乂丨乂丨</div>
+    <div class="small">Sign in or Sign up to chat</div>
+
+    <div id="authBox">
+      <input type="email" id="authEmail" placeholder="Email" />
+      <input type="password" id="authPassword" placeholder="Password" />
+      <div style="display:flex;gap:8px">
+        <button id="signinBtn" class="btn">Sign in</button>
+        <button id="signupBtn" class="ghost">Sign up</button>
+      </div>
+      <div style="margin-top:8px">
+        <button id="signoutBtn" class="ghost" style="display:none;width:100%">Sign out</button>
+      </div>
+      <div id="authMsg" class="small" style="margin-top:8px"></div>
+    </div>
+
+    <div id="messages"></div>
+
+    <div class="send-area">
+      <textarea id="messageInput" placeholder="Write your message..."></textarea>
+      <button id="sendBtn" class="btn">Send</button>
+    </div>
   </div>
 </div>
 
-<!-- SIGNUP / LOGIN MODAL -->
-<div id="authModal">
-  <div>
-    <h2 style="text-align:center;color:var(--accent)">Welcome to XiXi</h2>
-    <input type="email" id="emailInput" placeholder="Email">
-    <input type="password" id="passwordInput" placeholder="Password">
-    <button id="loginBtn">Login</button>
-    <button id="signupBtn">Sign Up</button>
-    <button id="guestBtn">Continue as Guest</button>
-  </div>
-</div>
-
-<!-- FIREBASE SDK -->
+<!-- Firebase modular SDK -->
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.6.2/firebase-app.js";
-import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.6.2/firebase-database.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.6.2/firebase-auth.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// FIREBASE CONFIG
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_DOMAIN",
-  databaseURL: "YOUR_DB_URL",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_BUCKET",
-  messagingSenderId: "YOUR_SENDER",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_ID",
   appId: "YOUR_APP_ID"
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
 const auth = getAuth(app);
+const db = getFirestore(app);
 
-// AUTH ELEMENTS
-const authModal = document.getElementById('authModal');
-const emailInput = document.getElementById('emailInput');
-const passwordInput = document.getElementById('passwordInput');
-const loginBtn = document.getElementById('loginBtn');
+const signinBtn = document.getElementById('signinBtn');
 const signupBtn = document.getElementById('signupBtn');
-const guestBtn = document.getElementById('guestBtn');
-
-let username = "Guest";
-
-signupBtn.addEventListener('click', async()=>{
-  try{
-    const userCred = await createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
-    username = userCred.user.email;
-    authModal.style.display='none';
-  }catch(e){alert(e.message);}
-});
-
-loginBtn.addEventListener('click', async()=>{
-  try{
-    const userCred = await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
-    username = userCred.user.email;
-    authModal.style.display='none';
-  }catch(e){alert(e.message);}
-});
-
-guestBtn.addEventListener('click', ()=>{
-  username = "Guest";
-  authModal.style.display='none';
-});
-
-// CHAT ELEMENTS
-const messagesDiv = document.getElementById('messages');
+const signoutBtn = document.getElementById('signoutBtn');
+const authEmail = document.getElementById('authEmail');
+const authPassword = document.getElementById('authPassword');
+const authMsg = document.getElementById('authMsg');
+const messagesEl = document.getElementById('messages');
 const messageInput = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendBtn');
 
-sendBtn.addEventListener('click', sendMessage);
-messageInput.addEventListener('keypress', e => {if(e.key==='Enter') sendMessage();});
+let currentUser = null;
 
-function sendMessage(){
-  if(messageInput.value.trim()==="") return;
-  push(ref(db, 'messages'), {user: username, text: messageInput.value});
+signupBtn.onclick = async () => {
+  const email = authEmail.value.trim();
+  const pw = authPassword.value.trim();
+  if(!email || !pw) { authMsg.textContent = 'Email and password required'; return; }
+  try {
+    await createUserWithEmailAndPassword(auth, email, pw);
+    authMsg.textContent = 'Signed up — logged in.';
+  } catch(e){ authMsg.textContent = e.message; }
+};
+
+signinBtn.onclick = async () => {
+  const email = authEmail.value.trim();
+  const pw = authPassword.value.trim();
+  if(!email || !pw) { authMsg.textContent = 'Email and password required'; return; }
+  try { await signInWithEmailAndPassword(auth, email, pw); authMsg.textContent=''; } 
+  catch(e){ authMsg.textContent = e.message; }
+};
+
+signoutBtn.onclick = () => signOut(auth);
+
+onAuthStateChanged(auth,user=>{
+  currentUser=user;
+  signoutBtn.style.display = user ? 'block' : 'none';
+});
+
+// Send message
+sendBtn.onclick = async ()=>{
+  if(!currentUser) { alert('Sign in first'); return; }
+  const text = messageInput.value.trim();
+  if(!text) return;
+  await addDoc(collection(db,'messages'), { text, uid: currentUser.uid, timestamp: serverTimestamp() });
   messageInput.value='';
-}
+};
 
-onChildAdded(ref(db, 'messages'), snapshot=>{
-  const msg = snapshot.val();
-  const div = document.createElement('div');
-  div.classList.add('msg');
-  if(msg.user === username) div.classList.add('me');
-  div.textContent = msg.user + ": " + msg.text;
-  messagesDiv.appendChild(div);
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+// Render messages
+onSnapshot(collection(db,'messages'), snap=>{
+  messagesEl.innerHTML='';
+  snap.forEach(docSnap=>{
+    const msg = docSnap.data();
+    const div = document.createElement('div');
+    div.className='msg'+(msg.uid===currentUser?.uid?' me':'');
+    div.textContent = msg.text;
+    messagesEl.appendChild(div);
+  });
+  messagesEl.scrollTop = messagesEl.scrollHeight;
 });
 </script>
-
 </body>
 </html>
