@@ -2,107 +2,193 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>乂丨乂丨</title>
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Stream + Global Chat</title>
 <style>
-  /* Reset */
-  * { box-sizing: border-box; margin:0; padding:0; }
-  body { font-family: 'Poppins', sans-serif; background:#0d0d0d; color:#fff; }
+/* STREAM + CHAT STYLES */
+#stream-widget { display: flex; flex-direction: row; max-width: 1000px; height: 500px; margin: 20px auto; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 6px 18px rgba(0,0,0,0.6);}
+#video-column { flex: 2; background: #000; }
+#video-column iframe { width: 100%; height: 100%; border: none; }
 
-  /* Container */
-  .container { display:flex; flex-direction:column; height:100vh; }
+#chat-column { flex: 1; display: flex; flex-direction: column; background: #111; color: #fff; position: relative; }
+#chat-header { padding: 6px; font-weight: bold; text-align: center; color: #DFF41F; background: #111; font-size: 14px; }
 
-  /* Header */
-  header { background:#1a1a1a; padding:15px; text-align:center; font-size:24px; font-weight:bold; color:#00d8ff; }
+#chat-messages { flex: 1; padding: 4px; overflow-y: auto; background: #000; font-size: 12px; margin-bottom: 0; }
+.message { margin-bottom: 4px; padding: 2px 4px; border-radius: 8px; font-size: 12px; max-width: 100%; word-wrap: break-word; opacity: 0; transform: translateY(3px); animation: fadeInUp 0.3s forwards; display: flex; align-items: center; justify-content: flex-start; text-align: left; }
+.message.self, .message.other { background: #222; }
+.message .username { font-weight: bold; margin-right: 4px; font-size:12px; }
+.message .text { font-size:12px; color:#fff; }
 
-  /* Main */
-  main { flex:1; display:flex; flex-direction:row; gap:10px; padding:10px; }
-  
-  /* Video */
-  #video-frame { flex:2; display:flex; align-items:center; justify-content:center; }
-  #video-frame video { width:100%; height:auto; border-radius:12px; max-height:80vh; }
+#chat-input-area { position: sticky; bottom: 0; display: flex; padding: 6px; border-top: 1px solid #444; background: #111; z-index: 10; }
+#chat-input { flex: 1; padding: 8px; border-radius: 12px; border: 1px solid #555; background: #000; color: #fff; font-size:16px; }
+#chat-send { margin-left: 4px; padding: 8px; border-radius: 12px; border: none; background: #DFF41F; cursor: pointer; font-weight: bold; font-size:16px; }
 
-  /* Chat */
-  #chat { flex:1; display:flex; flex-direction:column; background:#1a1a1a; border-radius:12px; overflow:hidden; }
-  #chat-messages { flex:1; padding:10px; overflow-y: auto; }
-  #chat input { padding:12px; border:none; width:100%; outline:none; font-size:16px; border-top:1px solid #333; background:#121212; color:#fff; border-radius:0 0 12px 12px; }
+#login-container { display:flex; flex-direction:column; gap:5px; padding:5px; background:#111; margin:4px; border-radius:6px;}
+#login-container input { padding:6px; border-radius:4px; border:none; width:100%; }
+#login-container button { padding:6px; border-radius:4px; border:none; background:#DFF41F; font-weight:bold; cursor:pointer; margin-top:4px; }
+#login-msg { color:#f00; min-height:18px; font-size:0.9em; }
+#stars-counter { padding:4px; text-align:center; font-weight:bold; color:#FFD700; }
 
-  .message { margin-bottom:10px; }
-  .message span { font-weight:bold; color:#00d8ff; margin-right:5px; }
+@keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
 
-  /* Scrollbar */
-  #chat-messages::-webkit-scrollbar { width:6px; }
-  #chat-messages::-webkit-scrollbar-thumb { background:#00d8ff; border-radius:3px; }
-
-  /* Mobile Responsive */
-  @media (max-width:768px) {
-    main { flex-direction:column; }
-    #chat { flex:none; height:250px; margin-top:10px; }
-    #video-frame video { max-height:50vh; }
-  }
+/* MOBILE RESPONSIVE */
+@media (max-width: 768px) {
+  #stream-widget { flex-direction: column; height: auto; max-width: 100%; border-radius: 0; box-shadow: none; }
+  #video-column { height: 200px; }
+  #chat-column { max-height: 250px; }
+  #chat-messages { font-size: 11px; }
+  .message { font-size: 11px; padding: 2px 3px; justify-content: flex-start; }
+  .message .username { font-size:11px; margin-right:3px; }
+  .message .text { font-size:11px; }
+  #chat-input { font-size:16px; }
+}
 </style>
 </head>
 <body>
-<div class="container">
-  <header>乂丨乂丨/header>
-  <main>
-    <div id="video-frame">
-      <video id="videoPlayer" controls>
-        <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4">
-        Your browser does not support HTML video.
-      </video>
+
+<div id="stream-widget">
+  <!-- VIDEO COLUMN -->
+  <div id="video-column">
+    <iframe id="stream-video" src="" title="Stream Video" frameborder="0" allowfullscreen></iframe>
+  </div>
+
+  <!-- CHAT COLUMN -->
+  <div id="chat-column">
+    <div id="chat-header">乂丨乂丨</div>
+    
+    <!-- Stars display -->
+    <div id="stars-counter">Stars: 0</div>
+    
+    <!-- Login / Signup -->
+    <div id="login-container">
+      <input type="email" id="email" placeholder="Email">
+      <input type="password" id="password" placeholder="Password">
+      <button id="signup-btn">Sign Up</button>
+      <button id="login-btn">Login</button>
+      <p id="login-msg"></p>
     </div>
-    <div id="chat">
-      <div id="chat-messages"></div>
-      <input type="text" id="chatInput" placeholder="Type a message..." />
+
+    <!-- Messages -->
+    <div id="chat-messages"></div>
+
+    <!-- Input area -->
+    <div id="chat-input-area">
+      <input id="chat-input" type="text" placeholder="Type your message...">
+      <button id="chat-send">Send</button>
     </div>
-  </main>
+  </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
 <script>
-  // ====== Firebase Config ======
+document.addEventListener('DOMContentLoaded', () => {
+  const videoIframe = document.getElementById('stream-video');
+  const messagesDiv = document.getElementById('chat-messages');
+  const input = document.getElementById('chat-input');
+  const sendBtn = document.getElementById('chat-send');
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const signupBtn = document.getElementById('signup-btn');
+  const loginBtn = document.getElementById('login-btn');
+  const loginMsg = document.getElementById('login-msg');
+  const starsCounter = document.getElementById('stars-counter');
+  const loginContainer = document.getElementById('login-container');
+
+  const VIDEO_URL = "https://www.youtube.com/embed/dQw4w9WgXcQ"; 
+  videoIframe.src = VIDEO_URL;
+
   const firebaseConfig = {
-    apiKey: "YOUR_FIREBASE_API_KEY",
-    authDomain: "YOUR_FIREBASE_PROJECT.firebaseapp.com",
-    databaseURL: "https://YOUR_FIREBASE_PROJECT.firebaseio.com",
-    projectId: "YOUR_FIREBASE_PROJECT",
-    storageBucket: "YOUR_FIREBASE_PROJECT.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyDmj1SQvIqI_A83EivlJfDg2z-kyUYIyrM",
+    authDomain: "xixichatroomdb.firebaseapp.com",
+    projectId: "xixichatroomdb",
+    storageBucket: "xixichatroomdb.firebasestorage.app",
+    messagingSenderId: "727244293530",
+    appId: "1:727244293530:web:29559cbcc18b49831b2623"
   };
 
-  // Initialize Firebase
   firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
-  const messagesRef = db.ref("messages");
+  const db = firebase.firestore();
+  const auth = firebase.auth();
 
-  // Chat elements
-  const chatInput = document.getElementById("chatInput");
-  const chatMessages = document.getElementById("chat-messages");
+  let currentUser = null;
+  let rewardInterval = null;
 
-  // Random username
-  const username = "User" + Math.floor(Math.random() * 1000);
+  // -------- Signup ----------
+  signupBtn.onclick = async () => {
+    loginMsg.textContent = "";
+    try{
+      const userCred = await auth.createUserWithEmailAndPassword(emailInput.value,passwordInput.value);
+      const uid = userCred.user.uid;
+      await db.collection('users').doc(uid).set({email:emailInput.value, stars:0, admin:false});
+    }catch(err){ loginMsg.textContent = err.message; }
+  }
 
-  // Send message
-  chatInput.addEventListener("keypress", function(e){
-    if(e.key === "Enter" && chatInput.value.trim() !== ""){
-      messagesRef.push({ name: username, text: chatInput.value });
-      chatInput.value = "";
+  // -------- Login ----------
+  loginBtn.onclick = async () => {
+    loginMsg.textContent = "";
+    try { await auth.signInWithEmailAndPassword(emailInput.value,passwordInput.value); }
+    catch(err){ loginMsg.textContent = err.message; }
+  }
+
+  // -------- Auth State ----------
+  auth.onAuthStateChanged(user=>{
+    if(user){
+      currentUser = user;
+      loginContainer.style.display="none";
+      startRewardTimer();
+      loadMessages();
+    } else {
+      currentUser=null;
+      loginContainer.style.display="flex";
+      clearInterval(rewardInterval);
+      starsCounter.textContent="Stars: 0";
     }
   });
 
-  // Listen for new messages
-  messagesRef.on("child_added", function(snapshot){
-    const data = snapshot.val();
-    const messageEl = document.createElement("div");
-    messageEl.classList.add("message");
-    messageEl.innerHTML = `<span>${data.name}:</span> ${data.text}`;
-    chatMessages.appendChild(messageEl);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  });
+  // -------- Send Message ----------
+  sendBtn.onclick = async () => {
+    const text = input.value.trim();
+    if(!text || !currentUser) return;
+    input.value="";
+    await db.collection('messages').add({
+      text,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      user: currentUser.uid,
+      username: currentUser.email.split("@")[0]
+    });
+  }
+
+  input.addEventListener('keypress', e=>{if(e.key==='Enter') sendBtn.click();});
+
+  // -------- Load Messages ----------
+  function loadMessages(){
+    db.collection('messages').orderBy('timestamp','asc').onSnapshot(snapshot=>{
+      messagesDiv.innerHTML="";
+      snapshot.forEach(doc=>{
+        const msg = doc.data();
+        const div = document.createElement('div');
+        div.classList.add('message');
+        div.innerHTML = `<span class="username">${msg.username}:</span> <span class="text">${msg.text}</span>`;
+        messagesDiv.appendChild(div);
+      });
+      messagesDiv.scroll({top:messagesDiv.scrollHeight, behavior:'smooth'});
+    });
+  }
+
+  // -------- Reward Timer ----------
+  function startRewardTimer(){
+    rewardInterval = setInterval(async ()=>{
+      if(!currentUser) return;
+      const userRef = db.collection('users').doc(currentUser.uid);
+      await userRef.update({stars: firebase.firestore.FieldValue.increment(1)});
+      const docSnap = await userRef.get();
+      starsCounter.textContent = "Stars: "+docSnap.data().stars;
+    },5*60*1000);
+  }
+});
 </script>
 </body>
 </html>
