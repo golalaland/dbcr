@@ -28,6 +28,8 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 #messages{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:6px;border-radius:8px;background:#000;margin-bottom:6px;}
 .msg{padding:8px;border-radius:10px;background:var(--glass);max-width:75%;position:relative;opacity:0;animation:fadeInUp 0.25s forwards;}
 .msg.me{margin-left:auto;background:rgba(223,244,31,0.08);}
+.msg .meta{font-size:11px;color:var(--muted);margin-bottom:4px;}
+.msg .content{font-size:13px;color:#fff;white-space:pre-wrap;}
 .send-area{
   display:flex;align-items:center;gap:6px;
   background:var(--card);padding:6px 12px;
@@ -114,7 +116,7 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* Firebase config */
@@ -134,6 +136,9 @@ const db = getFirestore(app);
 /* --- Auth --- */
 const signupBtn = document.getElementById("signupBtn");
 const signinBtn = document.getElementById("signinBtn");
+const signoutBtn = document.getElementById("signoutBtn");
+
+let currentUser = null;
 
 signupBtn.addEventListener("click", async () => {
   const email = document.getElementById("authEmail").value;
@@ -150,20 +155,49 @@ signinBtn.addEventListener("click", async () => {
   await signInWithEmailAndPassword(auth, email, pass);
 });
 
+signoutBtn.addEventListener("click", async ()=>{
+  await signOut(auth);
+});
+
 onAuthStateChanged(auth, user => {
   const profileName = document.getElementById("profileName");
   const uid = document.getElementById("uid");
   if(user){
-    profileName.textContent = document.getElementById("authUsername").value || user.email.split("@")[0];
+    const chatId = document.getElementById("authUsername").value.trim() || user.email.split("@")[0];
+    currentUser = { uid: user.uid, chatId };
+    profileName.textContent = chatId;
     uid.textContent = user.uid;
     document.getElementById("authBox").style.display = "none";
-    document.getElementById("signoutBtn").style.display = "block";
+    signoutBtn.style.display = "block";
   } else {
+    currentUser = null;
     profileName.textContent = "Guest";
     uid.textContent = "—";
     document.getElementById("authBox").style.display = "block";
-    document.getElementById("signoutBtn").style.display = "none";
+    signoutBtn.style.display = "none";
   }
+});
+
+/* --- Message system --- */
+const messageInput = document.getElementById("messageInput");
+const sendBtnEl = document.getElementById("sendBtn");
+const messagesEl = document.getElementById("messages");
+
+function addMessage(chatId, text){
+  const msgEl = document.createElement("div");
+  msgEl.classList.add("msg");
+  if(currentUser && chatId === currentUser.chatId) msgEl.classList.add("me");
+  msgEl.innerHTML = `<div class="meta">${chatId}</div><div class="content">${text}</div>`;
+  messagesEl.appendChild(msgEl);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+sendBtnEl.addEventListener("click", ()=>{
+  const text = messageInput.value.trim();
+  if(!text || !currentUser) return;
+  addMessage(currentUser.chatId, text);
+  messageInput.value = "";
+  // TODO: send to Firestore
 });
 
 /* --- Star system --- */
@@ -173,7 +207,7 @@ const starPopup = document.getElementById("starPopup");
 const starText = document.getElementById("starText");
 const closeStarBtn = document.getElementById("closeStar");
 
-function showStarPopup() {
+function showStarPopup(){
   stars += 1;
   starCountEl.textContent = stars;
   starText.innerHTML = `You've just earned +1 star! ⭐`;
@@ -182,8 +216,9 @@ function showStarPopup() {
 }
 closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
 
-// TEST: every 10 sec for demo
+// TEST: every 10 sec
 setInterval(showStarPopup,10000);
+
 </script>
 
 </body>
