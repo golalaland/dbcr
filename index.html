@@ -150,7 +150,7 @@ sendLinkBtn.addEventListener("click", async () => {
     await runTransaction(db, async (transaction) => {
       const snap = await getDoc(doc(db,"chatIds",chatId));
       if(snap.exists()) throw new Error("Chat ID already taken");
-      transaction.set(doc(db,"chatIds",chatId), { reserved:true });
+      transaction.set(doc(db,"chatIds",chatId), { reserved:true, timestamp:serverTimestamp() });
     });
 
     const actionCodeSettings = { url: window.location.href, handleCodeInApp: true };
@@ -175,6 +175,8 @@ if(isSignInWithEmailLink(auth, window.location.href)){
         const userSnap = await getDoc(userDocRef);
         if(!userSnap.exists()){
           await setDoc(userDocRef, { chatId, email, stars:0 });
+          // Optional: delete the reservation after successful signup
+          await setDoc(doc(db,"chatIds",chatId), { reserved:false }, { merge:true });
         }
         window.localStorage.removeItem('emailForSignIn');
         window.localStorage.removeItem('chatIdForSignIn');
@@ -193,13 +195,17 @@ onAuthStateChanged(auth, async user=>{
     try{
       const userDocRef = doc(db,"users",user.uid);
       const userSnap = await getDoc(userDocRef);
-      currentUser = { uid:user.uid, chatId: userSnap.data().chatId };
-      profileName.textContent = currentUser.chatId;
+      if(!userSnap.exists()){ throw new Error("User record not found"); }
+
+      const chatId = userSnap.data().chatId;
+      currentUser = { uid:user.uid, chatId };
+      profileName.textContent = chatId;
       uidEl.textContent = user.uid;
 
       authBox.style.display = "none";
       signoutBtn.style.display = "block";
 
+      // Load messages
       const messagesRef = collection(db,"messages");
       const messagesQuery = query(messagesRef,orderBy("timestamp","asc"));
       onSnapshot(messagesQuery,snap=>{
@@ -217,6 +223,7 @@ onAuthStateChanged(auth, async user=>{
       });
 
     }catch(err){ showError(err); }
+
   }else{
     currentUser=null;
     profileName.textContent="Guest";
@@ -227,7 +234,9 @@ onAuthStateChanged(auth, async user=>{
 });
 
 /* SIGN OUT */
-signoutBtn.addEventListener("click", async ()=>{ try{ await signOut(auth); } catch(err){ showError(err); } });
+signoutBtn.addEventListener("click", async ()=>{
+  try{ await signOut(auth); } catch(err){ showError(err); }
+});
 
 /* MESSAGES */
 const messageInput = document.getElementById("messageInput");
@@ -265,7 +274,6 @@ function showStarPopup(){
 }
 closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
 setInterval(showStarPopup,10000);
-
 </script>
 </body>
 </html>
