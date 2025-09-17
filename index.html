@@ -26,10 +26,9 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 #videoContainer{width:100%;aspect-ratio:16/9;background:#111;border-radius:12px;overflow:hidden;}
 #videoContainer iframe{width:100%;height:100%;border:0;border-radius:12px;}
 #messages{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:6px;border-radius:8px;background:#000;margin-bottom:6px;}
-.msg{padding:8px;border-radius:10px;background:var(--glass);max-width:75%;position:relative;opacity:0;animation:fadeInUp 0.25s forwards;}
-.msg.me{margin-left:auto;background:rgba(223,244,31,0.08);}
-.msg .meta{font-size:11px;color:var(--muted);margin-bottom:4px;}
-.msg .content{font-size:13px;color:#fff;white-space:pre-wrap;}
+.msg{font-size:13px;display:flex;gap:6px;align-items:flex-start;}
+.msg .username{font-weight:700;}
+.msg .text{color:#fff;white-space:pre-wrap;flex:1;}
 .send-area{
   display:flex;align-items:center;gap:6px;
   background:var(--card);padding:6px 12px;
@@ -52,18 +51,9 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
   background:var(--card);padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);
   display:none;z-index:1000;color:var(--accent);font-size:12px;white-space:nowrap;text-align:center;max-width:90%;
 }
-@keyframes fadeInUp{to{opacity:1;transform:translateY(0);}}
-@media (max-width:600px){
-  .send-area{padding:6px 8px;}
-  .send-area button.btn{padding:6px 12px;font-size:13px;}
-  .send-area input{font-size:13px;padding:8px 12px;}
-  .brand{font-size:24px;}
-  .room-desc{font-size:11px;}
-}
 </style>
 </head>
 <body>
-
 <div class="app">
 
   <!-- Brand + Room Description -->
@@ -114,9 +104,9 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, addDoc, orderBy, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, orderBy, serverTimestamp, onSnapshot, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// ✅ Your Firebase Config
+// ✅ Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyCBnnH-pQJ0l0zOvrmoSVp37EQWubJQDxc",
   authDomain: "chatroomdb4xixi.firebaseapp.com",
@@ -130,115 +120,122 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+/* --- Globals --- */
+let currentUser = null;
+let stars = 0;
+
 /* --- Auth --- */
 const signupBtn = document.getElementById("signupBtn");
 const signinBtn = document.getElementById("signinBtn");
 const signoutBtn = document.getElementById("signoutBtn");
 
-let currentUser = null;
-
 signupBtn.addEventListener("click", async () => {
   const email = document.getElementById("authEmail").value;
   const pass = document.getElementById("authPassword").value;
   const chatId = document.getElementById("authUsername").value.trim();
-
   if (!chatId || chatId.length < 4) return alert("Chat ID must be at least 4 characters.");
 
-  // Check uniqueness
-  const usersRef = collection(db, "users");
-  const q = query(usersRef, where("chatId", "==", chatId));
-  const querySnap = await getDocs(q);
-  if (!querySnap.empty) return alert("Chat ID already exists.");
+  const q = query(collection(db, "users"), where("chatId", "==", chatId));
+  if (!(await getDocs(q)).empty) return alert("Chat ID already exists.");
 
   const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-  const user = userCredential.user;
-  await setDoc(doc(db, "users", user.uid), { chatId, email, stars: 0 });
+  await setDoc(doc(db, "users", userCredential.user.uid), { chatId, email, stars: 0 });
 });
 
 signinBtn.addEventListener("click", async () => {
-  const email = document.getElementById("authEmail").value;
-  const pass = document.getElementById("authPassword").value;
-  await signInWithEmailAndPassword(auth, email, pass);
+  await signInWithEmailAndPassword(auth,
+    document.getElementById("authEmail").value,
+    document.getElementById("authPassword").value
+  );
 });
+signoutBtn.addEventListener("click", async () => { await signOut(auth); });
 
-signoutBtn.addEventListener("click", async () => {
-  await signOut(auth);
-});
-
+/* --- State --- */
 onAuthStateChanged(auth, async user => {
-  const profileName = document.getElementById("profileName");
-  const uidEl = document.getElementById("uid");
   if (user) {
-    const userDoc = await getDoc(doc(db, "users", user.uid));
-    const chatId = userDoc.exists() ? userDoc.data().chatId : "Unknown";
-    currentUser = { uid: user.uid, chatId };
-    profileName.textContent = chatId;
-    uidEl.textContent = user.uid;
+    const userDocRef = doc(db, "users", user.uid);
+    const userDoc = await getDoc(userDocRef);
+    if (!userDoc.exists()) return;
+    const data = userDoc.data();
+
+    currentUser = { uid: user.uid, chatId: data.chatId };
+    stars = data.stars || 0;
+    document.getElementById("profileName").textContent = data.chatId;
+    document.getElementById("uid").textContent = user.uid;
+    document.getElementById("starCount").textContent = stars;
+
     document.getElementById("authBox").style.display = "none";
     signoutBtn.style.display = "block";
 
-    // Load messages in real-time
-    const messagesRef = collection(db, "messages");
-    const messagesQuery = query(messagesRef, orderBy("timestamp", "asc"));
+    // Load chat messages
+    const messagesQuery = query(collection(db, "messages"), orderBy("timestamp", "asc"));
     onSnapshot(messagesQuery, snap => {
       const messagesEl = document.getElementById("messages");
       messagesEl.innerHTML = "";
-      snap.forEach(doc => {
-        const data = doc.data();
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
         const msgEl = document.createElement("div");
         msgEl.classList.add("msg");
-        if (data.chatId === currentUser.chatId) msgEl.classList.add("me");
-        msgEl.innerHTML = `<div class="meta">${data.chatId}</div><div class="content">${data.text}</div>`;
+
+        // Random consistent color per username
+        const color = stringToColor(data.chatId);
+
+        msgEl.innerHTML = `<span class="username" style="color:${color}">${data.chatId}:</span> <span class="text">${data.text}</span>`;
         messagesEl.appendChild(msgEl);
       });
       messagesEl.scrollTop = messagesEl.scrollHeight;
     });
-
   } else {
     currentUser = null;
-    profileName.textContent = "Guest";
-    uidEl.textContent = "—";
+    document.getElementById("profileName").textContent = "Guest";
+    document.getElementById("uid").textContent = "—";
     document.getElementById("authBox").style.display = "block";
     signoutBtn.style.display = "none";
   }
 });
 
-/* --- Message system --- */
-const messageInput = document.getElementById("messageInput");
-const sendBtnEl = document.getElementById("sendBtn");
-const messagesEl = document.getElementById("messages");
-
-sendBtnEl.addEventListener("click", async () => {
-  const text = messageInput.value.trim();
+/* --- Chat send --- */
+document.getElementById("sendBtn").addEventListener("click", async () => {
+  const text = document.getElementById("messageInput").value.trim();
   if (!text || !currentUser) return;
-
   await addDoc(collection(db, "messages"), {
     chatId: currentUser.chatId,
     text,
     timestamp: serverTimestamp()
   });
-  messageInput.value = "";
+  document.getElementById("messageInput").value = "";
 });
 
 /* --- Star system --- */
-let stars = 0;
 const starCountEl = document.getElementById("starCount");
 const starPopup = document.getElementById("starPopup");
 const starText = document.getElementById("starText");
-const closeStarBtn = document.getElementById("closeStar");
+document.getElementById("closeStar").addEventListener("click", () => { starPopup.style.display = "none"; });
 
-function showStarPopup() {
-  stars += 1;
+async function giveStar() {
+  if (!currentUser) return;
+  stars++;
   starCountEl.textContent = stars;
   starText.innerHTML = `You've just earned +1 star! ⭐`;
   starPopup.style.display = "block";
   setTimeout(() => { starPopup.style.display = "none"; }, 3000);
+
+  // Save to Firestore
+  await updateDoc(doc(db, "users", currentUser.uid), { stars: increment(1) });
 }
-closeStarBtn.addEventListener("click", () => { starPopup.style.display = "none"; });
 
-// TEST: every 10 sec
-setInterval(showStarPopup, 10000);
+// Example: give star every 10s
+setInterval(giveStar, 10000);
 
+/* --- Helpers --- */
+function stringToColor(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+  return "#" + "00000".substring(0, 6 - c.length) + c;
+}
 </script>
 </body>
 </html>
