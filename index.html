@@ -70,7 +70,7 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
   <div class="brand">乂丨乂丨</div>
   <div class="room-desc">Money Talk 💸 — Chat. Own your vibe.</div>
 
-  <!-- Auth: original design preserved -->
+  <!-- Auth -->
   <div id="authBox">
     <input type="text" id="authUsername" placeholder="Chat ID" />
     <input type="email" id="authEmail" placeholder="Email" />
@@ -85,15 +85,12 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 
   <!-- Center panel: Video + Chat -->
   <div id="center">
-    <!-- Video Embed -->
     <div id="videoContainer">
       <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="Video" allowfullscreen></iframe>
     </div>
 
-    <!-- Messages -->
     <div id="messages"></div>
 
-    <!-- Twitch-style send area -->
     <div class="send-area">
       <input type="text" id="messageInput" placeholder="Type your message..." />
       <button id="sendBtn" class="btn">Send</button>
@@ -117,125 +114,129 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, setDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-document.addEventListener("DOMContentLoaded", () => {
+/* --- Firebase config --- */
+const firebaseConfig = {
+  apiKey: "AIzaSyBLSE-HNfQ1ZOxUWBn8CK3VXyy6818cYe0",
+  authDomain: "dbcr-c8e5c.firebaseapp.com",
+  projectId: "dbcr-c8e5c",
+  storageBucket: "dbcr-c8e5c.firebasestorage.app",
+  messagingSenderId: "611977707226",
+  appId: "1:611977707226:web:ad7675c0b353a05f41afe3"
+};
 
-  /* Firebase config */
-  const firebaseConfig = {
-    apiKey: "AIzaSyBLSE-HNfQ1ZOxUWBn8CK3VXyy6818cYe0",
-    authDomain: "dbcr-c8e5c.firebaseapp.com",
-    projectId: "dbcr-c8e5c",
-    storageBucket: "dbcr-c8e5c.firebasestorage.app",
-    messagingSenderId: "611977707226",
-    appId: "1:611977707226:web:ad7675c0b353a05f41afe3"
-  };
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
+/* --- Auth --- */
+const signupBtn = document.getElementById("signupBtn");
+const signinBtn = document.getElementById("signinBtn");
+const signoutBtn = document.getElementById("signoutBtn");
 
-  /* --- Auth --- */
-  const signupBtn = document.getElementById("signupBtn");
-  const signinBtn = document.getElementById("signinBtn");
-  const signoutBtn = document.getElementById("signoutBtn");
-  const profileName = document.getElementById("profileName");
-  const uidEl = document.getElementById("uid");
-  const authBox = document.getElementById("authBox");
-  let currentUser = null;
+let currentUser = null;
 
-  signupBtn.addEventListener("click", async () => {
-    const email = document.getElementById("authEmail").value;
-    const pass = document.getElementById("authPassword").value;
-    const chatId = document.getElementById("authUsername").value.trim();
-    if(!chatId) return alert("Enter Chat ID");
-    await createUserWithEmailAndPassword(auth, email, pass);
-    await setDoc(doc(db, "users", email), { chatId });
-  });
-
-  signinBtn.addEventListener("click", async () => {
-    const email = document.getElementById("authEmail").value;
-    const pass = document.getElementById("authPassword").value;
-    await signInWithEmailAndPassword(auth, email, pass);
-  });
-
-  signoutBtn.addEventListener("click", async ()=>{
-    await signOut(auth);
-  });
-
-  onAuthStateChanged(auth, user => {
-    if(user){
-      const chatId = document.getElementById("authUsername").value.trim() || "Guest";
-      currentUser = { uid: user.uid, chatId };
-      profileName.textContent = chatId;
-      uidEl.textContent = user.uid;
-      authBox.style.display = "none";
-      signoutBtn.style.display = "block";
-    } else {
-      currentUser = null;
-      profileName.textContent = "Guest";
-      uidEl.textContent = "—";
-      authBox.style.display = "block";
-      signoutBtn.style.display = "none";
-    }
-  });
-
-  /* --- Messaging --- */
-  const messagesEl = document.getElementById("messages");
-  const messageInput = document.getElementById("messageInput");
-  const sendBtnEl = document.getElementById("sendBtn");
-  const ROOM_ID = "moneyTalk";
-
-  function addMessage(chatId, text){
-    const msgEl = document.createElement("div");
-    msgEl.classList.add("msg");
-    if(currentUser && chatId === currentUser.chatId) msgEl.classList.add("me");
-    msgEl.innerHTML = `<div class="meta">${chatId}</div><div class="content">${text}</div>`;
-    messagesEl.appendChild(msgEl);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
-
-  sendBtnEl.addEventListener("click", async ()=>{
-    const text = messageInput.value.trim();
-    if(!text || !currentUser) return;
-    addMessage(currentUser.chatId, text);
-    messageInput.value = "";
-    await addDoc(collection(db, "rooms", ROOM_ID, "messages"), {
-      chatId: currentUser.chatId,
-      text,
-      timestamp: serverTimestamp()
-    });
-  });
-
-  const messagesQuery = query(collection(db, "rooms", ROOM_ID, "messages"), orderBy("timestamp"));
-  onSnapshot(messagesQuery, snapshot=>{
-    messagesEl.innerHTML = "";
-    snapshot.forEach(doc=>{
-      const data = doc.data();
-      addMessage(data.chatId, data.text);
-    });
-  });
-
-  /* --- Stars --- */
-  let stars = 0;
-  const starCountEl = document.getElementById("starCount");
-  const starPopup = document.getElementById("starPopup");
-  const starText = document.getElementById("starText");
-  const closeStarBtn = document.getElementById("closeStar");
-
-  function showStarPopup(){
-    stars += 1;
-    starCountEl.textContent = stars;
-    starText.innerHTML = `You've just earned +1 star! ⭐`;
-    starPopup.style.display = "block";
-    setTimeout(()=>{starPopup.style.display="none";},3000);
-  }
-  closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
-
-  // TEST: every 10 sec
-  setInterval(showStarPopup,10000);
-
+signupBtn.addEventListener("click", async () => {
+  const email = document.getElementById("authEmail").value;
+  const pass = document.getElementById("authPassword").value;
+  const chatId = document.getElementById("authUsername").value.trim();
+  if(!chatId) return alert("Enter Chat ID");
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+    const user = userCredential.user;
+    await setDoc(doc(db, "users", user.uid), { chatId });
+  } catch(e){console.error(e); alert(e.message);}
 });
+
+signinBtn.addEventListener("click", async () => {
+  const email = document.getElementById("authEmail").value;
+  const pass = document.getElementById("authPassword").value;
+  try { await signInWithEmailAndPassword(auth, email, pass); }
+  catch(e){console.error(e); alert(e.message);}
+});
+
+signoutBtn.addEventListener("click", async ()=>{
+  await signOut(auth);
+});
+
+/* --- On Auth State Change --- */
+onAuthStateChanged(auth, async user => {
+  const profileName = document.getElementById("profileName");
+  const uid = document.getElementById("uid");
+  const authBox = document.getElementById("authBox");
+  if(user){
+    currentUser = { uid: user.uid, chatId: "" };
+    const userDoc = await (await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js')).getDoc(doc(db,"users",user.uid));
+    if(userDoc.exists()) currentUser.chatId = userDoc.data().chatId;
+    else currentUser.chatId = user.email.split("@")[0];
+    profileName.textContent = currentUser.chatId;
+    uid.textContent = user.uid;
+    authBox.style.display = "none";
+    signoutBtn.style.display = "block";
+  } else {
+    currentUser = null;
+    profileName.textContent = "Guest";
+    uid.textContent = "—";
+    authBox.style.display = "block";
+    signoutBtn.style.display = "none";
+  }
+});
+
+/* --- Firestore real-time messages --- */
+const messagesEl = document.getElementById("messages");
+const messageInput = document.getElementById("messageInput");
+const sendBtnEl = document.getElementById("sendBtn");
+
+function addMessage(msg){
+  const msgEl = document.createElement("div");
+  msgEl.classList.add("msg");
+  if(currentUser && msg.chatId === currentUser.chatId) msgEl.classList.add("me");
+  msgEl.innerHTML = `<div class="meta">${msg.chatId}</div><div class="content">${msg.text}</div>`;
+  messagesEl.appendChild(msgEl);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+/* --- Send Message --- */
+sendBtnEl.addEventListener("click", async ()=>{
+  const text = messageInput.value.trim();
+  if(!text || !currentUser) return;
+  await addDoc(collection(db,"messages"),{
+    chatId: currentUser.chatId,
+    text,
+    timestamp: serverTimestamp()
+  });
+  messageInput.value = "";
+});
+
+/* --- Real-time listener --- */
+const messagesQuery = query(collection(db,"messages"), orderBy("timestamp"));
+onSnapshot(messagesQuery, snapshot=>{
+  messagesEl.innerHTML = "";
+  snapshot.forEach(doc=>{
+    addMessage(doc.data());
+  });
+});
+
+/* --- Star system --- */
+let stars = 0;
+const starCountEl = document.getElementById("starCount");
+const starPopup = document.getElementById("starPopup");
+const starText = document.getElementById("starText");
+const closeStarBtn = document.getElementById("closeStar");
+
+function showStarPopup(){
+  stars += 1;
+  starCountEl.textContent = stars;
+  starText.innerHTML = `You've just earned +1 star! ⭐`;
+  starPopup.style.display = "block";
+  setTimeout(()=>{starPopup.style.display="none";},3000);
+}
+closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
+
+// TEST: every 10 sec
+setInterval(showStarPopup,10000);
+
 </script>
 
 </body>
