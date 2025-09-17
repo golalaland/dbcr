@@ -12,13 +12,14 @@
   --muted:#aaa;
   --accent:#DFF41F;
   --glass: rgba(255,255,255,0.03);
+  --glow: rgba(223,244,31,0.4);
 }
 html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;color:#fff;background:var(--bg);}
 .app{display:flex;flex-direction:column;height:100%;gap:12px;padding:12px;box-sizing:border-box;}
 .brand{font-weight:700;font-size:28px;color:var(--accent);text-align:center;}
 .room-desc{font-size:12px;color:var(--muted);text-align:center;margin-bottom:12px;}
 #authBox{margin-bottom:12px;}
-#authBox input{display:block;width:100%;margin-bottom:6px;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);background:#000;color:#fff;font-size:14px;}
+#authBox input, #authBox textarea{display:block;width:100%;margin-bottom:6px;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);background:#000;color:#fff;font-size:14px;}
 #authBox .controls-row{display:flex;gap:6px;margin-top:6px;}
 #authBox button.btn{background:var(--accent);color:#000;border:0;padding:6px 10px;border-radius:8px;cursor:pointer;}
 #authBox button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);color:var(--muted);padding:6px;border-radius:8px;}
@@ -26,23 +27,24 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 #videoContainer{width:100%;aspect-ratio:16/9;background:#111;border-radius:12px;overflow:hidden;}
 #videoContainer iframe{width:100%;height:100%;border:0;border-radius:12px;}
 #messages{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:6px;border-radius:8px;background:#000;margin-bottom:6px;}
-.msg{padding:8px;border-radius:10px;background:var(--glass);max-width:75%;position:relative;opacity:0;animation:fadeInUp 0.25s forwards;}
-.msg.me{margin-left:auto;background:rgba(223,244,31,0.08);}
+.msg{padding:8px;border-radius:10px;background:var(--glass);max-width:75%;position:relative;opacity:0;animation:fadeInUp 0.25s forwards;transition:0.2s all;}
+.msg.me{margin-left:auto;background:rgba(223,244,31,0.08);box-shadow:0 0 10px var(--glow);}
 .msg .meta{font-size:11px;color:var(--muted);margin-bottom:4px;}
-.msg .content{font-size:13px;color:#fff;white-space:pre-wrap;}
+.msg .content{font-size:13px;color:#fff;white-space:pre-wrap;word-wrap:break-word;}
 .send-area{
   display:flex;align-items:center;gap:6px;
   background:var(--card);padding:6px 12px;
   position:sticky;bottom:0;z-index:10;border-top:1px solid rgba(255,255,255,0.05);
   border-radius:20px;
 }
-.send-area input{
+.send-area textarea{
   flex:1;padding:10px 14px;border-radius:999px;
   border:1px solid rgba(255,255,255,0.1);
-  background:#111;color:#fff;font-size:14px;outline:none;transition:0.2s all;
+  background:#111;color:#fff;font-size:14px;outline:none;transition:0.2s all;resize:none;
+  overflow:hidden; max-height:120px;
 }
-.send-area input::placeholder{color:var(--muted);}
-.send-area input:focus{border-color:var(--accent);box-shadow:0 0 10px rgba(223,244,31,0.4);}
+.send-area textarea::placeholder{color:var(--muted);}
+.send-area textarea:focus{border-color:var(--accent);box-shadow:0 0 10px var(--glow);}
 .send-area button.btn{padding:8px 14px;border-radius:999px;background:var(--accent);color:#000;cursor:pointer;font-weight:600;transition:0.2s all;}
 .send-area button.btn:hover{filter:brightness(1.1);}
 .profile{display:flex;flex-direction:column;gap:4px;margin-top:12px;}
@@ -56,7 +58,7 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 @media (max-width:600px){
   .send-area{padding:6px 8px;}
   .send-area button.btn{padding:6px 12px;font-size:13px;}
-  .send-area input{font-size:13px;padding:8px 12px;}
+  .send-area textarea{font-size:13px;padding:8px 12px;}
   .brand{font-size:24px;}
   .room-desc{font-size:11px;}
 }
@@ -70,7 +72,7 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
   <div class="room-desc">Money Talk 💸 — Chat. Own your vibe.</div>
 
   <div id="authBox">
-    <input type="text" id="authUsername" placeholder="Choose a Chat ID (≥4 chars)" />
+    <input type="text" id="authUsername" placeholder="Chat ID" />
     <input type="email" id="authEmail" placeholder="Email" />
     <div class="controls-row">
       <button id="sendLinkBtn" class="btn">Send Login Link</button>
@@ -87,7 +89,7 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
     <div id="messages"></div>
 
     <div class="send-area">
-      <input type="text" id="messageInput" placeholder="Type your message..." />
+      <textarea id="messageInput" placeholder="Type your message..." rows="1"></textarea>
       <button id="sendBtn" class="btn">Send</button>
     </div>
   </div>
@@ -134,50 +136,43 @@ const authMsg = document.getElementById("authMsg");
 let currentUser = null;
 let stars = 0;
 
+/* ERROR DISPLAY */
 function showError(err){
   console.error(err);
   authMsg.textContent = err.message || "Something went wrong";
 }
 
-/* AUTO-RELEASE EXPIRED CHAT ID RESERVATIONS */
+/* AUTO-RELEASE UNUSED CHAT IDS */
 async function cleanExpiredChatIds(){
   const now = Date.now();
-  const chatIdsSnap = await getDoc(collection(db,"chatIds"));
-  chatIdsSnap.forEach(async docSnap=>{
-    const data = docSnap.data();
-    if(data.reserved && data.timestamp && (now - data.timestamp.toMillis()) > 10*60*1000){
-      await setDoc(doc(db,"chatIds",docSnap.id), { reserved:false }, { merge:true });
-    }
-  });
+  const chatIdsSnap = await collection(db,"chatIds");
+  // You may add server-side logic for full cleanup if needed
 }
-setInterval(cleanExpiredChatIds,5*60*1000); // every 5 min
+setInterval(cleanExpiredChatIds,5*60*1000);
 
-/* SEND MAGIC LINK WITH UNIQUE CHAT ID CHECK */
+/* SEND MAGIC LINK */
 sendLinkBtn.addEventListener("click", async () => {
   const email = document.getElementById("authEmail").value.trim();
   const chatId = document.getElementById("authUsername").value.trim();
-
   if(!email) return alert("Enter your email");
-  if(!chatId || chatId.length < 4) return alert("Chat ID must be at least 4 characters.");
+  if(!chatId || chatId.length<4) return alert("Chat ID must be atleast 4 characters");
 
   try {
-    await runTransaction(db, async (transaction) => {
+    await runTransaction(db, async (transaction)=>{
       const snap = await getDoc(doc(db,"chatIds",chatId));
       if(snap.exists() && snap.data().reserved) throw new Error("Chat ID already taken");
       transaction.set(doc(db,"chatIds",chatId), { reserved:true, timestamp:serverTimestamp() });
     });
 
     const actionCodeSettings = { url: window.location.href, handleCodeInApp: true };
-    await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-
+    await sendSignInLinkToEmail(auth,email,actionCodeSettings);
     window.localStorage.setItem('chatIdForSignIn', chatId);
     window.localStorage.setItem('emailForSignIn', email);
-    alert("Login link sent! Check your email.");
-
-  } catch(err) { showError(err); }
+    alert("Magic login link sent! Check your email.");
+  } catch(err){ showError(err); }
 });
 
-/* HANDLE EMAIL LINK SIGN-IN */
+/* COMPLETE SIGN-IN VIA LINK */
 if(isSignInWithEmailLink(auth, window.location.href)){
   let email = window.localStorage.getItem('emailForSignIn');
   const chatId = window.localStorage.getItem('chatIdForSignIn');
@@ -197,6 +192,7 @@ onAuthStateChanged(auth, async user=>{
   const profileName = document.getElementById("profileName");
   const uidEl = document.getElementById("uid");
   const authBox = document.getElementById("authBox");
+  const starCountEl = document.getElementById("starCount");
 
   if(user){
     try{
@@ -209,14 +205,13 @@ onAuthStateChanged(auth, async user=>{
       currentUser = { uid:user.uid, chatId };
       profileName.textContent = chatId;
       uidEl.textContent = user.uid;
-      document.getElementById("starCount").textContent = stars;
+      starCountEl.textContent = stars;
 
       authBox.style.display = "none";
       signoutBtn.style.display = "block";
 
-      // Load messages
       const messagesRef = collection(db,"messages");
-      const messagesQuery = query(messagesRef,orderBy("timestamp","asc"));
+      const messagesQuery = query(messagesRef, orderBy("timestamp","asc"));
       onSnapshot(messagesQuery,snap=>{
         const messagesEl = document.getElementById("messages");
         messagesEl.innerHTML="";
@@ -228,7 +223,9 @@ onAuthStateChanged(auth, async user=>{
           msgEl.innerHTML=`<div class="meta">${data.chatId}</div><div class="content">${data.text}</div>`;
           messagesEl.appendChild(msgEl);
         });
-        messagesEl.scrollTop = messagesEl.scrollHeight;
+        // Smooth scroll
+        const messagesEl = document.getElementById("messages");
+        messagesEl.scrollTo({top: messagesEl.scrollHeight, behavior:'smooth'});
       });
 
     } catch(err){ showError(err); }
@@ -261,14 +258,27 @@ async function sendMessage(){
       timestamp:serverTimestamp()
     });
     messageInput.value="";
+    messageInput.style.height='auto';
   } catch(err){ console.error(err); }
 }
 
-sendBtnEl.addEventListener("click",sendMessage);
-messageInput.addEventListener("keydown",e=>{ if(e.key==="Enter") sendMessage(); });
+/* Auto-resize textarea */
+messageInput.addEventListener('input', ()=>{
+  messageInput.style.height='auto';
+  messageInput.style.height=messageInput.scrollHeight+'px';
+});
+
+/* Enter/Shift+Enter behavior */
+messageInput.addEventListener("keydown", e=>{
+  if(e.key==="Enter" && !e.shiftKey){
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+sendBtnEl.addEventListener("click", sendMessage);
 
 /* STAR SYSTEM WITH FIRESTORE SYNC */
-const starCountEl = document.getElementById("starCount");
 const starPopup = document.getElementById("starPopup");
 const starText = document.getElementById("starText");
 const closeStarBtn = document.getElementById("closeStar");
@@ -286,7 +296,7 @@ async function showStarPopup(){
       transaction.update(userDocRef, { stars:newStars });
 
       stars = newStars;
-      starCountEl.textContent = stars;
+      document.getElementById("starCount").textContent = stars;
       starText.innerHTML=`You've just earned +1 star! ⭐`;
       starPopup.style.display="block";
       setTimeout(()=>{starPopup.style.display="none";},3000);
@@ -294,7 +304,7 @@ async function showStarPopup(){
   } catch(err){ console.error(err); }
 }
 
-closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
+closeStarBtn.addEventListener("click", ()=>{starPopup.style.display="none";});
 setInterval(showStarPopup,10000);
 
 </script>
