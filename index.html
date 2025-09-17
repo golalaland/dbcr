@@ -72,7 +72,7 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 
   <!-- Auth: original design preserved -->
   <div id="authBox">
-    <input type="text" id="authUsername" placeholder="Chat ID" />
+    <input type="text" id="authUsername" placeholder="Chat ID (min 4 chars)" />
     <input type="email" id="authEmail" placeholder="Email" />
     <input type="password" id="authPassword" placeholder="Password" />
     <div class="controls-row">
@@ -117,7 +117,7 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* Firebase config */
 const firebaseConfig = {
@@ -126,7 +126,7 @@ const firebaseConfig = {
   projectId: "dbcr-c8e5c",
   storageBucket: "dbcr-c8e5c.firebasestorage.app",
   messagingSenderId: "611977707226",
-  appId: "1:611977226:web:2927ceda326371f241afe3"
+  appId: "1:611977707226:web:2927ceda326371f241afe3"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -141,58 +141,72 @@ const signoutBtn = document.getElementById("signoutBtn");
 let currentUser = null;
 
 signupBtn.addEventListener("click", async () => {
-  const email = document.getElementById("authEmail").value;
+  const email = document.getElementById("authEmail").value.trim();
   const pass = document.getElementById("authPassword").value;
   const chatId = document.getElementById("authUsername").value.trim();
-  if(!chatId) return alert("Enter Chat ID");
+  const authMsg = document.getElementById("authMsg");
+  authMsg.textContent = "";
+
+  if(chatId.length < 4){ authMsg.textContent="Chat ID must be at least 4 chars."; return;}
+  if(!email || !pass){ authMsg.textContent="Enter email and password."; return;}
+
   try{
-    const userCredential = await createUserWithEmailAndPassword(auth,email,pass);
+    const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
     const uid = userCredential.user.uid;
-    await setDoc(doc(db,"users",uid), {chatId, stars:0});
-  } catch(e){alert(e.message);}
+    await setDoc(doc(db, "users", uid), { chatId, email, stars:0, createdAt: serverTimestamp() });
+  } catch(err){
+    authMsg.textContent = err.message;
+  }
 });
 
 signinBtn.addEventListener("click", async () => {
-  const email = document.getElementById("authEmail").value;
+  const email = document.getElementById("authEmail").value.trim();
   const pass = document.getElementById("authPassword").value;
-  try{await signInWithEmailAndPassword(auth,email,pass);}
-  catch(e){alert(e.message);}
+  const authMsg = document.getElementById("authMsg");
+  authMsg.textContent = "";
+
+  try{
+    await signInWithEmailAndPassword(auth, email, pass);
+  } catch(err){
+    authMsg.textContent = err.message;
+  }
 });
 
 signoutBtn.addEventListener("click", async ()=>{
   await signOut(auth);
 });
 
-onAuthStateChanged(auth, async (user) => {
+/* --- Auth state --- */
+onAuthStateChanged(auth, async user => {
   const profileName = document.getElementById("profileName");
   const uidEl = document.getElementById("uid");
+  const starCountEl = document.getElementById("starCount");
   if(user){
-    currentUser = { uid:user.uid, chatId:"" };
     const userDoc = await getDoc(doc(db,"users",user.uid));
-    if(userDoc.exists()){
-      currentUser.chatId = userDoc.data().chatId;
-      currentUser.stars = userDoc.data().stars || 0;
-      document.getElementById("starCount").textContent = currentUser.stars;
-    }
+    const data = userDoc.data();
+    currentUser = { uid: user.uid, chatId: data.chatId, stars: data.stars || 0 };
     profileName.textContent = currentUser.chatId;
-    uidEl.textContent = user.uid;
+    uidEl.textContent = currentUser.uid;
+    starCountEl.textContent = currentUser.stars;
     document.getElementById("authBox").style.display = "none";
     signoutBtn.style.display = "block";
+    listenMessages();
   } else {
-    currentUser=null;
-    profileName.textContent="Guest";
-    uidEl.textContent="—";
-    document.getElementById("authBox").style.display="block";
-    signoutBtn.style.display="none";
+    currentUser = null;
+    profileName.textContent = "Guest";
+    uidEl.textContent = "—";
+    starCountEl.textContent = 0;
+    document.getElementById("authBox").style.display = "block";
+    signoutBtn.style.display = "none";
   }
 });
 
-/* --- Message system --- */
+/* --- Messages --- */
 const messageInput = document.getElementById("messageInput");
 const sendBtnEl = document.getElementById("sendBtn");
 const messagesEl = document.getElementById("messages");
 
-function addMessage(chatId,text){
+function addMessage(chatId, text){
   const msgEl = document.createElement("div");
   msgEl.classList.add("msg");
   if(currentUser && chatId === currentUser.chatId) msgEl.classList.add("me");
@@ -204,24 +218,39 @@ function addMessage(chatId,text){
 sendBtnEl.addEventListener("click", async ()=>{
   const text = messageInput.value.trim();
   if(!text || !currentUser) return;
-  addMessage(currentUser.chatId,text);
-  messageInput.value="";
-  // TODO: send to Firestore if needed
+  // send to Firestore
+  await addDoc(collection(db,"messages"),{
+    chatId: currentUser.chatId,
+    text,
+    room: "Money Talk 💸",
+    createdAt: serverTimestamp()
+  });
+  messageInput.value = "";
 });
 
+function listenMessages(){
+  const q = query(collection(db,"messages"), orderBy("createdAt","asc"));
+  onSnapshot(q, snapshot=>{
+    messagesEl.innerHTML="";
+    snapshot.forEach(doc=>{
+      const m = doc.data();
+      addMessage(m.chatId, m.text);
+    });
+  });
+}
+
 /* --- Star system --- */
-const starCountEl = document.getElementById("starCount");
 const starPopup = document.getElementById("starPopup");
 const starText = document.getElementById("starText");
 const closeStarBtn = document.getElementById("closeStar");
 
 function showStarPopup(){
   if(!currentUser) return;
-  currentUser.stars +=1;
-  starCountEl.textContent = currentUser.stars;
-  starText.textContent = `You've just earned +1 star! ⭐`;
-  starPopup.style.display="block";
-  setDoc(doc(db,"users",currentUser.uid),{chatId:currentUser.chatId,stars:currentUser.stars});
+  currentUser.stars += 1;
+  document.getElementById("starCount").textContent = currentUser.stars;
+  starText.innerHTML = `You've just earned +1 star! ⭐`;
+  starPopup.style.display = "block";
+  setDoc(doc(db,"users",currentUser.uid),{stars:currentUser.stars},{merge:true});
   setTimeout(()=>{starPopup.style.display="none";},3000);
 }
 closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
@@ -230,6 +259,5 @@ closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
 setInterval(showStarPopup,10000);
 
 </script>
-
 </body>
 </html>
