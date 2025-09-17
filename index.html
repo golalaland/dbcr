@@ -15,14 +15,14 @@
 }
 html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;color:#fff;background:var(--bg);}
 .app{display:flex;flex-direction:column;height:100%;gap:12px;padding:12px;box-sizing:border-box;}
-.brand{font-weight:700;font-size:24px;color:var(--accent);text-align:center;}
+.brand{font-weight:700;font-size:28px;color:var(--accent);text-align:center;}
 .room-desc{font-size:12px;color:var(--muted);text-align:center;margin-bottom:12px;}
-#authBox{margin-bottom:12px;}
-input,button,textarea{font-family:inherit;}
-input,textarea{width:100%;padding:8px;border-radius:12px;border:1px solid rgba(255,255,255,0.05);background:#111;color:#fff;box-sizing:border-box;}
-textarea{resize:none;}
-button.btn{background:var(--accent);color:#000;border:0;padding:6px 16px;border-radius:12px;cursor:pointer;}
+#authBox{margin-bottom:12px;display:flex;flex-direction:column;gap:6px;}
+input,button,textarea{font-family:inherit;box-sizing:border-box;}
+input,textarea{background:#111;color:#fff;border:1px solid rgba(255,255,255,0.05);border-radius:12px;padding:10px;font-size:14px;}
+button.btn{background:var(--accent);color:#000;border:none;padding:6px 16px;border-radius:12px;cursor:pointer;font-weight:600;transition:0.2s;}
 button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);color:var(--muted);padding:6px;border-radius:8px;}
+button.btn:hover{filter:brightness(1.1);}
 #center{flex:1;display:flex;flex-direction:column;gap:6px;}
 #videoContainer{width:100%;aspect-ratio:16/9;background:#111;border-radius:12px;overflow:hidden;}
 #videoContainer iframe{width:100%;height:100%;border:0;border-radius:12px;}
@@ -30,9 +30,20 @@ button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);colo
 .msg{padding:8px;border-radius:10px;background:var(--glass);max-width:75%;position:relative;opacity:0;animation:fadeInUp 0.25s forwards;}
 .msg.me{margin-left:auto;background:rgba(223,244,31,0.08);}
 .send-area{
-  display:flex;gap:6px;padding:6px;align-items:center;background:var(--card);border-top:1px solid rgba(255,255,255,0.05);position:sticky;bottom:0;z-index:10;
+  display:flex;align-items:center;gap:6px;
+  background:var(--card);padding:6px 12px;
+  position:sticky;bottom:0;z-index:10;border-top:1px solid rgba(255,255,255,0.05);
+  border-radius:20px;
 }
-#messageInput{flex:1;min-height:36px;max-height:100px;border-radius:20px;padding:10px;background:#111;border:1px solid rgba(255,255,255,0.05);color:#fff;}
+.send-area input{
+  flex:1;padding:10px 14px;border-radius:999px;
+  border:1px solid rgba(255,255,255,0.1);
+  background:#111;color:#fff;font-size:14px;outline:none;transition:0.2s all;
+}
+.send-area input::placeholder{color:var(--muted);}
+.send-area input:focus{border-color:var(--accent);box-shadow:0 0 10px rgba(223,244,31,0.4);}
+.send-area button.btn{padding:8px 14px;border-radius:999px;background:var(--accent);color:#000;cursor:pointer;font-weight:600;transition:0.2s all;}
+.send-area button.btn:hover{filter:brightness(1.1);}
 .profile{display:flex;flex-direction:column;gap:4px;margin-top:12px;}
 .profile .small{font-size:12px;color:var(--muted);}
 .star-popup{
@@ -41,6 +52,13 @@ button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);colo
   display:none;z-index:1000;color:var(--accent);font-size:12px;white-space:nowrap;text-align:center;max-width:90%;
 }
 @keyframes fadeInUp{to{opacity:1;transform:translateY(0);}}
+@media (max-width:600px){
+  .send-area{padding:6px 8px;}
+  .send-area button.btn{padding:6px 12px;font-size:13px;}
+  .send-area input{font-size:13px;padding:8px 12px;}
+  .brand{font-size:24px;}
+  .room-desc{font-size:11px;}
+}
 </style>
 </head>
 <body>
@@ -49,14 +67,14 @@ button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);colo
 
   <!-- Brand + Room Description -->
   <div class="brand">乂丨乂丨</div>
-  <div class="room-desc">Money Talk 💸 — Discuss finance, tips, and strategies</div>
+  <div class="room-desc">Money Talk 💸 — Chat. Own your vibe.</div>
 
   <!-- Auth -->
   <div id="authBox">
-    <input type="text" id="authUsername" placeholder="Chat ID" style="margin-bottom:6px" />
-    <input type="email" id="authEmail" placeholder="Email" style="margin-bottom:6px" />
-    <input type="password" id="authPassword" placeholder="Password" style="margin-bottom:6px" />
-    <div style="display:flex;gap:6px;margin-bottom:6px">
+    <input type="text" id="authUsername" placeholder="Chat ID" />
+    <input type="email" id="authEmail" placeholder="Email" />
+    <input type="password" id="authPassword" placeholder="Password" />
+    <div style="display:flex;gap:6px">
       <button id="signinBtn" class="btn">Sign in</button>
       <button id="signupBtn" class="ghost">Sign up</button>
       <button id="signoutBtn" class="ghost" style="display:none">Sign out</button>
@@ -73,9 +91,9 @@ button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);colo
     <!-- Messages -->
     <div id="messages"></div>
 
-    <!-- Send area -->
+    <!-- Twitch-style send area -->
     <div class="send-area">
-      <textarea id="messageInput" placeholder="Write your message..."></textarea>
+      <input type="text" id="messageInput" placeholder="Type your message..." />
       <button id="sendBtn" class="btn">Send</button>
     </div>
   </div>
