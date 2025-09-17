@@ -116,8 +116,14 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, setDoc, collection, query, where, getDocs, addDoc, orderBy, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { 
+  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, 
+  onAuthStateChanged, signOut 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { 
+  getFirestore, doc, setDoc, collection, query, where, getDocs, addDoc, 
+  orderBy, serverTimestamp, onSnapshot 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* Firebase config */
 const firebaseConfig = {
@@ -137,52 +143,79 @@ const db = getFirestore(app);
 const signupBtn = document.getElementById("signupBtn");
 const signinBtn = document.getElementById("signinBtn");
 const signoutBtn = document.getElementById("signoutBtn");
+const authMsg = document.getElementById("authMsg");
 
 let currentUser = null;
 
+async function displayError(err){
+  console.error(err);
+  authMsg.textContent = err.message || "Something went wrong.";
+}
+
+// SIGN UP
 signupBtn.addEventListener("click", async () => {
-  const email = document.getElementById("authEmail").value;
+  const email = document.getElementById("authEmail").value.trim();
   const pass = document.getElementById("authPassword").value;
   const chatId = document.getElementById("authUsername").value.trim();
 
   if(!chatId || chatId.length < 4) return alert("Chat ID must be at least 4 characters.");
 
-  // Check uniqueness
-  const usersRef = collection(db, "users");
-  const q = query(usersRef, where("chatId", "==", chatId));
-  const querySnap = await getDocs(q);
-  if(!querySnap.empty) return alert("Chat ID already exists.");
+  try{
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("chatId", "==", chatId));
+    const querySnap = await getDocs(q);
+    if(!querySnap.empty) return alert("Chat ID already exists.");
 
-  const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-  const user = userCredential.user;
-  await setDoc(doc(db, "users", user.uid), { chatId, email, stars: 0 });
+    const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+    const user = userCredential.user;
+    await setDoc(doc(db, "users", user.uid), { chatId, email, stars: 0 });
+  }catch(err){
+    displayError(err);
+  }
 });
 
+// SIGN IN
 signinBtn.addEventListener("click", async () => {
-  const email = document.getElementById("authEmail").value;
+  const email = document.getElementById("authEmail").value.trim();
   const pass = document.getElementById("authPassword").value;
-  await signInWithEmailAndPassword(auth, email, pass);
+
+  try{
+    await signInWithEmailAndPassword(auth, email, pass);
+  }catch(err){
+    displayError(err);
+  }
 });
 
+// SIGN OUT
 signoutBtn.addEventListener("click", async ()=>{
-  await signOut(auth);
+  try{
+    await signOut(auth);
+  }catch(err){
+    displayError(err);
+  }
 });
 
+// AUTH STATE CHANGE
 onAuthStateChanged(auth, async user => {
   const profileName = document.getElementById("profileName");
   const uidEl = document.getElementById("uid");
+  const authBox = document.getElementById("authBox");
+
   if(user){
-    const userDoc = await getDocs(query(collection(db,"users"), where("email","==",user.email)));
-    const chatId = userDoc.docs[0].data().chatId;
+    const userDocSnap = await getDocs(query(collection(db,"users"), where("email","==",user.email)));
+    if(userDocSnap.empty) return;
+
+    const chatId = userDocSnap.docs[0].data().chatId;
     currentUser = { uid: user.uid, chatId };
     profileName.textContent = chatId;
     uidEl.textContent = user.uid;
-    document.getElementById("authBox").style.display = "none";
+
+    authBox.style.display = "none";
     signoutBtn.style.display = "block";
 
-    // Load messages in real-time
     const messagesRef = collection(db, "messages");
     const messagesQuery = query(messagesRef, orderBy("timestamp","asc"));
+
     onSnapshot(messagesQuery, snap=>{
       const messagesEl = document.getElementById("messages");
       messagesEl.innerHTML = "";
@@ -197,11 +230,14 @@ onAuthStateChanged(auth, async user => {
       messagesEl.scrollTop = messagesEl.scrollHeight;
     });
 
+    // Focus input automatically
+    document.getElementById("messageInput").focus();
+
   } else {
     currentUser = null;
     profileName.textContent = "Guest";
     uidEl.textContent = "—";
-    document.getElementById("authBox").style.display = "block";
+    authBox.style.display = "block";
     signoutBtn.style.display = "none";
   }
 });
@@ -209,18 +245,28 @@ onAuthStateChanged(auth, async user => {
 /* --- Message system --- */
 const messageInput = document.getElementById("messageInput");
 const sendBtnEl = document.getElementById("sendBtn");
-const messagesEl = document.getElementById("messages");
 
-sendBtnEl.addEventListener("click", async ()=>{
+async function sendMessage(){
   const text = messageInput.value.trim();
   if(!text || !currentUser) return;
 
-  await addDoc(collection(db,"messages"),{
-    chatId: currentUser.chatId,
-    text,
-    timestamp: serverTimestamp()
-  });
-  messageInput.value = "";
+  try{
+    await addDoc(collection(db,"messages"),{
+      chatId: currentUser.chatId,
+      text,
+      timestamp: serverTimestamp()
+    });
+    messageInput.value = "";
+  }catch(err){
+    console.error(err);
+  }
+}
+
+sendBtnEl.addEventListener("click", sendMessage);
+
+// ENTER key to send
+messageInput.addEventListener("keydown", e=>{
+  if(e.key === "Enter") sendMessage();
 });
 
 /* --- Star system --- */
