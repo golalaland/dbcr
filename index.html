@@ -70,7 +70,7 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
   <div class="brand">乂丨乂丨</div>
   <div class="room-desc">Money Talk 💸 — Chat. Own your vibe.</div>
 
-  <!-- Auth: original design preserved -->
+  <!-- Auth -->
   <div id="authBox">
     <input type="text" id="authUsername" placeholder="Chat ID" />
     <input type="email" id="authEmail" placeholder="Email" />
@@ -83,9 +83,8 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
     <div id="authMsg" class="small-ghost" style="margin-top:6px"></div>
   </div>
 
-  <!-- Center panel: Video + Chat -->
+  <!-- Center panel -->
   <div id="center">
-    <!-- Video Embed -->
     <div id="videoContainer">
       <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="Video" allowfullscreen></iframe>
     </div>
@@ -117,9 +116,9 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* Firebase config */
+/* --- Firebase config --- */
 const firebaseConfig = {
   apiKey: "AIzaSyBLSE-HNfQ1ZOxUWBn8CK3VXyy6818cYe0",
   authDomain: "dbcr-c8e5c.firebaseapp.com",
@@ -140,90 +139,85 @@ const signoutBtn = document.getElementById("signoutBtn");
 
 let currentUser = null;
 
-signupBtn.addEventListener("click", async () => {
-  const email = document.getElementById("authEmail").value;
+async function createUserDoc(user, chatId){
+  const userRef = doc(db, "users", user.uid);
+  const docSnap = await getDoc(userRef);
+  if(!docSnap.exists()){
+    await setDoc(userRef, { chatId, stars:0, lastActive: new Date().toISOString() });
+  }
+  return userRef;
+}
+
+signupBtn.addEventListener("click", async ()=>{
+  const email = document.getElementById("authEmail").value.trim();
   const pass = document.getElementById("authPassword").value;
   const chatId = document.getElementById("authUsername").value.trim();
   if(!chatId) return alert("Enter Chat ID");
-  try {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-    const user = userCredential.user;
-    await setDoc(doc(db, "users", user.uid), {
-      chatId,
-      email,
-      stars: 0,
-      lastActive: serverTimestamp()
-    });
-  } catch(e){console.error(e); alert(e.message);}
+  try{
+    const userCred = await createUserWithEmailAndPassword(auth, email, pass);
+    await createUserDoc(userCred.user, chatId);
+  }catch(e){alert(e.message);}
 });
 
-signinBtn.addEventListener("click", async () => {
-  const email = document.getElementById("authEmail").value;
+signinBtn.addEventListener("click", async ()=>{
+  const email = document.getElementById("authEmail").value.trim();
   const pass = document.getElementById("authPassword").value;
-  try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, pass);
-    const user = userCredential.user;
-    const userSnap = await getDoc(doc(db, "users", user.uid));
-    if(userSnap.exists()){
-      currentUser = userSnap.data();
-      currentUser.uid = user.uid;
-      profileName.textContent = currentUser.chatId;
-      uid.textContent = currentUser.uid;
-      starCountEl.textContent = currentUser.stars || 0;
-      document.getElementById("authBox").style.display = "none";
-      signoutBtn.style.display = "block";
-    }
-  } catch(e){console.error(e); alert(e.message);}
+  try{
+    const userCred = await signInWithEmailAndPassword(auth, email, pass);
+    await createUserDoc(userCred.user, document.getElementById("authUsername").value.trim());
+  }catch(e){alert(e.message);}
 });
 
 signoutBtn.addEventListener("click", async ()=>{
   await signOut(auth);
 });
 
-onAuthStateChanged(auth, user => {
-  if(!user){
+/* --- Auth state --- */
+onAuthStateChanged(auth, async (user)=>{
+  const profileName = document.getElementById("profileName");
+  const uidEl = document.getElementById("uid");
+  if(user){
+    const chatIdInput = document.getElementById("authUsername").value.trim();
+    const userRef = doc(db, "users", user.uid);
+    const docSnap = await getDoc(userRef);
+    const chatId = chatIdInput || (docSnap.exists() ? docSnap.data().chatId : user.email.split("@")[0]);
+    const stars = docSnap.exists() ? docSnap.data().stars : 0;
+    currentUser = { uid:user.uid, chatId, stars };
+    profileName.textContent = chatId;
+    document.getElementById("starCount").textContent = stars;
+    uidEl.textContent = user.uid;
+    document.getElementById("authBox").style.display="none";
+    signoutBtn.style.display="block";
+  } else {
     currentUser = null;
     profileName.textContent = "Guest";
-    uid.textContent = "—";
-    starCountEl.textContent = 0;
-    document.getElementById("authBox").style.display = "block";
-    signoutBtn.style.display = "none";
+    uidEl.textContent = "—";
+    document.getElementById("authBox").style.display="block";
+    signoutBtn.style.display="none";
+    document.getElementById("starCount").textContent = 0;
   }
 });
 
-/* --- Message system --- */
+/* --- Messages --- */
 const messageInput = document.getElementById("messageInput");
 const sendBtnEl = document.getElementById("sendBtn");
 const messagesEl = document.getElementById("messages");
 
-function addMessage(data){
+function addMessage(chatId, text){
   const msgEl = document.createElement("div");
   msgEl.classList.add("msg");
-  if(currentUser && data.chatId === currentUser.chatId) msgEl.classList.add("me");
-  msgEl.innerHTML = `<div class="meta">${data.chatId}</div><div class="content">${data.text}</div>`;
+  if(currentUser && chatId===currentUser.chatId) msgEl.classList.add("me");
+  msgEl.innerHTML = `<div class="meta">${chatId}</div><div class="content">${text}</div>`;
   messagesEl.appendChild(msgEl);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-sendBtnEl.addEventListener("click", async ()=>{
+sendBtnEl.addEventListener("click", ()=>{
   const text = messageInput.value.trim();
   if(!text || !currentUser) return;
-
-  await addDoc(collection(db,"messages"),{
-    chatId: currentUser.chatId,
-    text,
-    timestamp: serverTimestamp()
-  });
-  messageInput.value = "";
-});
-
-/* Real-time listener */
-const messagesQuery = query(collection(db,"messages"), orderBy("timestamp"));
-onSnapshot(messagesQuery, snapshot=>{
-  messagesEl.innerHTML = "";
-  snapshot.forEach(doc=>{
-    addMessage(doc.data());
-  });
+  addMessage(currentUser.chatId, text);
+  messageInput.value="";
+  // TODO: store message to Firestore collection for persistent chat
 });
 
 /* --- Star system --- */
@@ -234,19 +228,15 @@ const starText = document.getElementById("starText");
 const closeStarBtn = document.getElementById("closeStar");
 
 function showStarPopup(){
-  if(!currentUser) return;
-  currentUser.stars = (currentUser.stars || 0) + 1;
-  starCountEl.textContent = currentUser.stars;
-  starText.innerHTML = `You've just earned +1 star! ⭐`;
-  starPopup.style.display = "block";
-
-  // Save stars to Firestore
-  setDoc(doc(db, "users", currentUser.uid), {
-    ...currentUser,
-    lastActive: serverTimestamp()
-  });
-
-  setTimeout(()=>{starPopup.style.display="none";},3000);
+  if(currentUser){
+    stars += 1;
+    starCountEl.textContent = stars;
+    starText.innerHTML = `You've just earned +1 star! ⭐`;
+    starPopup.style.display="block";
+    setTimeout(()=>{starPopup.style.display="none";},3000);
+    // Update Firestore
+    setDoc(doc(db,"users",currentUser.uid), {chatId:currentUser.chatId, stars}, {merge:true});
+  }
 }
 closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
 
@@ -254,6 +244,5 @@ closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
 setInterval(showStarPopup,10000);
 
 </script>
-
 </body>
 </html>
