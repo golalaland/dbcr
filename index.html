@@ -15,6 +15,7 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 #authBox button{cursor:pointer;}
 #authBox button.btn{background:var(--accent);color:#000;border:0;padding:6px 10px;border-radius:8px;}
 #authBox button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);color:var(--muted);padding:6px;border-radius:8px;}
+#authMsg{margin-top:6px;color:#DFF41F;font-size:13px;}
 #center{flex:1;display:flex;flex-direction:column;gap:6px;}
 #videoContainer{width:100%;aspect-ratio:16/9;background:#111;border-radius:12px;overflow:hidden;}
 #videoContainer iframe{width:100%;height:100%;border:0;border-radius:12px;}
@@ -43,7 +44,7 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
       <button id="sendLinkBtn" class="btn">Send Login Link</button>
       <button id="signoutBtn" class="ghost" style="display:none">Sign out</button>
     </div>
-    <div id="authMsg" style="margin-top:6px;color:#DFF41F;"></div>
+    <div id="authMsg"></div>
   </div>
 
   <div id="center">
@@ -99,51 +100,70 @@ const authMsg = document.getElementById("authMsg");
 let currentUser = null;
 let stars = 0;
 
-/* HELPER */
-function showError(err){
-  console.error(err);
-  authMsg.textContent = err.message || "Something went wrong";
-}
-
 /* SEND LOGIN LINK */
 sendLinkBtn.addEventListener("click", async () => {
-  console.log("Send link clicked");
   authMsg.textContent = "";
   const email = document.getElementById("authEmail").value.trim();
   const chatId = document.getElementById("authUsername").value.trim();
-
   if(!email){ alert("Enter your email"); return; }
   if(!chatId || chatId.length<4){ alert("Chat ID must be ≥4 characters"); return; }
 
   try {
-    // Reserve chat ID if not already
-    await runTransaction(db, async (t)=>{
-      const chatRef = doc(db,"chatIds",chatId);
-      const snap = await t.get(chatRef);
-      if(snap.exists() && snap.data().reserved) throw new Error("Chat ID taken");
-      t.set(chatRef,{reserved:true,timestamp:serverTimestamp()});
-    });
+    const chatRef = doc(db,"chatIds",chatId);
+    const chatSnap = await getDoc(chatRef);
 
+    if(chatSnap.exists()){
+      const registeredEmail = chatSnap.data().email;
+      if(registeredEmail && registeredEmail !== email){
+        authMsg.style.fontSize="12px";
+        authMsg.textContent="Sorry, chat ID is already taken";
+        return;
+      }
+    }
+
+    await setDoc(chatRef, {reserved:true,email}, {merge:true});
+    
     const actionCodeSettings = { url: window.location.href, handleCodeInApp: true };
     await sendSignInLinkToEmail(auth,email,actionCodeSettings);
     window.localStorage.setItem('chatIdForSignIn', chatId);
     window.localStorage.setItem('emailForSignIn', email);
-    authMsg.textContent="Magic link sent! Check your email.";
-  } catch(err){ showError(err); }
+
+    authMsg.style.fontSize="13px";
+    authMsg.textContent="Magic login link sent! Check your email.";
+
+    // Resend timer
+    sendLinkBtn.disabled=true;
+    let countdown=20;
+    const timer = setInterval(()=>{
+      sendLinkBtn.textContent=`Resend in ${countdown}s`;
+      countdown--;
+      if(countdown<0){
+        clearInterval(timer);
+        sendLinkBtn.disabled=false;
+        sendLinkBtn.textContent="Send Login Link";
+      }
+    },1000);
+
+  } catch(err){
+    console.error(err);
+    authMsg.style.fontSize="12px";
+    authMsg.textContent=err.message || "Something went wrong";
+  }
 });
 
 /* COMPLETE SIGN-IN */
 if(isSignInWithEmailLink(auth, window.location.href)){
   let email = window.localStorage.getItem('emailForSignIn');
-  const chatId = window.localStorage.getItem('chatIdForSignIn');
-  if(!email) email = prompt("Enter your email to complete login");
-
-  signInWithEmailLink(auth,email,window.location.href).then(async result=>{
+  if(!email) email = prompt('Enter your email for confirmation');
+  signInWithEmailLink(auth,email,window.location.href)
+  .then(async result=>{
+    const chatId = window.localStorage.getItem('chatIdForSignIn');
     const user = result.user;
-    await setDoc(doc(db,"users",user.uid), { chatId,email,stars:0 }, { merge:true });
-    window.localStorage.removeItem('emailForSignIn');
+    await setDoc(doc(db,"users",user.uid),{ chatId,email,stars:0 }, {merge:true});
     window.localStorage.removeItem('chatIdForSignIn');
-  }).catch(showError);
+    window.localStorage.removeItem('emailForSignIn');
+  })
+  .catch(err=>{ console.error(err); authMsg.textContent="Login failed"; });
 }
 
 /* AUTH STATE CHANGE */
@@ -185,20 +205,20 @@ onAuthStateChanged(auth, async user=>{
         messagesEl.scrollTo({top: messagesEl.scrollHeight, behavior:'smooth'});
       });
 
-    } catch(err){ showError(err); }
+    } catch(err){ console.error(err); }
 
   } else {
     currentUser = null;
     profileName.textContent="Guest";
     uidEl.textContent="—";
-    authBox.style.display = "block";
+    authBox.style.display="block";
     signoutBtn.style.display="none";
   }
 });
 
 /* SIGN OUT */
 signoutBtn.addEventListener("click", async ()=>{
-  try{ await signOut(auth); } catch(err){ showError(err); }
+  try{ await signOut(auth); } catch(err){ console.error(err); }
 });
 
 /* SEND MESSAGE */
@@ -256,7 +276,6 @@ async function showStarPopup(){
     });
   }catch(err){ console.error(err); }
 }
-
 closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
 setInterval(showStarPopup,10000);
 </script>
