@@ -72,6 +72,7 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 
   <!-- Auth -->
   <div id="authBox">
+    <input type="text" id="authUsername" placeholder="Choose a Chat ID (unique, ≥4 chars)" />
     <input type="email" id="authEmail" placeholder="Email" />
     <div class="controls-row">
       <button id="sendLinkBtn" class="btn">Send Login Link</button>
@@ -113,17 +114,17 @@ import {
   getAuth, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, onAuthStateChanged, signOut 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { 
-  getFirestore, doc, setDoc, getDoc, collection, query, orderBy, serverTimestamp, addDoc, onSnapshot 
+  getFirestore, doc, setDoc, getDoc, collection, query, orderBy, serverTimestamp, addDoc, onSnapshot, where, getDocs 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* Firebase config */
 const firebaseConfig = {
-  apiKey: "AIzaSyBLSE-HNfQ1ZOxUWBn8CK3VXyy6818cYe0",
-  authDomain: "dbcr-c8e5c.firebaseapp.com",
-  projectId: "dbcr-c8e5c",
-  storageBucket: "dbcr-c8e5c.firebasestorage.app",
-  messagingSenderId: "611977707226",
-  appId: "1:611977707226:web:2927ceda326371f241afe3"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -141,10 +142,19 @@ function showError(err){
   authMsg.textContent = err.message || "Something went wrong";
 }
 
-/* SEND MAGIC LINK */
+/* SEND MAGIC LINK WITH UNIQUE CHAT ID CHECK */
 sendLinkBtn.addEventListener("click", async () => {
   const email = document.getElementById("authEmail").value.trim();
-  if (!email) return alert("Enter your email");
+  const chatId = document.getElementById("authUsername").value.trim();
+
+  if(!email) return alert("Enter your email");
+  if(!chatId || chatId.length < 4) return alert("Chat ID must be at least 4 characters.");
+
+  // Check uniqueness of chatId
+  const usersRef = collection(db, "users");
+  const q = query(usersRef, where("chatId", "==", chatId));
+  const querySnap = await getDocs(q);
+  if (!querySnap.empty) return alert("Chat ID already taken. Choose another.");
 
   const actionCodeSettings = {
     url: window.location.href,
@@ -154,40 +164,32 @@ sendLinkBtn.addEventListener("click", async () => {
   try {
     await sendSignInLinkToEmail(auth, email, actionCodeSettings);
     window.localStorage.setItem('emailForSignIn', email);
-    alert("Check your email for the login link!");
-  } catch(err) {
-    showError(err);
-  }
+    window.localStorage.setItem('chatIdForSignIn', chatId);
+    alert("Magic link sent! Check your email to log in.");
+  } catch (err) { showError(err); }
 });
 
-/* HANDLE MAGIC LINK ON LOAD */
-window.addEventListener('load', async () => {
-  if (isSignInWithEmailLink(auth, window.location.href)) {
-    let email = window.localStorage.getItem('emailForSignIn');
-    if (!email) email = window.prompt('Please enter your email to confirm login');
-
-    try {
-      const result = await signInWithEmailLink(auth, email, window.location.href);
-      const user = result.user;
-
-      // Firestore user record
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        // First-time login → create chatId based on email
-        await setDoc(userRef, { chatId: email.split('@')[0], email, stars: 0 });
-      } else {
-        // Returning user → update last login
-        await setDoc(userRef, { lastLogin: new Date() }, { merge: true });
-      }
-
-      window.localStorage.removeItem('emailForSignIn');
-      alert("Logged in successfully!");
-    } catch(err) {
-      showError(err);
+/* AUTO-SIGN IN WITH LINK */
+if (isSignInWithEmailLink(auth, window.location.href)) {
+  let email = window.localStorage.getItem('emailForSignIn');
+  let chatId = window.localStorage.getItem('chatIdForSignIn');
+  if (!email) email = prompt('Enter your email to confirm sign-in');
+  try {
+    const result = await signInWithEmailLink(auth, email, window.location.href);
+    const user = result.user;
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) {
+      await setDoc(userRef, { chatId, email, stars: 0 });
     }
-  }
+    window.localStorage.removeItem('emailForSignIn');
+    window.localStorage.removeItem('chatIdForSignIn');
+  } catch (err) { showError(err); }
+}
+
+/* SIGN OUT */
+signoutBtn.addEventListener("click", async ()=>{
+  try{ await signOut(auth); } catch(err){ showError(err); }
 });
 
 /* AUTH STATE CHANGE */
@@ -238,5 +240,42 @@ onAuthStateChanged(auth, async user=>{
   }
 });
 
-/* SIGN OUT */
-signoutBtn.addEventListener("click", async ()=>{
+/* MESSAGES */
+const messageInput = document.getElementById("messageInput");
+const sendBtnEl = document.getElementById("sendBtn");
+
+async function sendMessage(){
+  const text = messageInput.value.trim();
+  if(!text || !currentUser) return;
+  try{
+    await addDoc(collection(db,"messages"),{
+      chatId:currentUser.chatId,
+      text,
+      timestamp:serverTimestamp()
+    });
+    messageInput.value="";
+  }catch(err){ console.error(err); }
+}
+
+sendBtnEl.addEventListener("click",sendMessage);
+messageInput.addEventListener("keydown",e=>{ if(e.key==="Enter") sendMessage(); });
+
+/* STAR SYSTEM */
+let stars=0;
+const starCountEl = document.getElementById("starCount");
+const starPopup = document.getElementById("starPopup");
+const starText = document.getElementById("starText");
+const closeStarBtn = document.getElementById("closeStar");
+
+function showStarPopup(){
+  stars+=1;
+  starCountEl.textContent=stars;
+  starText.innerHTML=`You've just earned +1 star! ⭐`;
+  starPopup.style.display="block";
+  setTimeout(()=>{starPopup.style.display="none";},3000);
+}
+closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
+setInterval(showStarPopup,10000);
+</script>
+</body>
+</html>
