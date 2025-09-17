@@ -70,7 +70,7 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
   <div class="brand">乂丨乂丨</div>
   <div class="room-desc">Money Talk 💸 — Chat. Own your vibe.</div>
 
-  <!-- Auth -->
+  <!-- Auth: original design preserved -->
   <div id="authBox">
     <input type="text" id="authUsername" placeholder="Chat ID" />
     <input type="email" id="authEmail" placeholder="Email" />
@@ -83,14 +83,17 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
     <div id="authMsg" class="small-ghost" style="margin-top:6px"></div>
   </div>
 
-  <!-- Video + Chat -->
+  <!-- Center panel: Video + Chat -->
   <div id="center">
+    <!-- Video Embed -->
     <div id="videoContainer">
       <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="Video" allowfullscreen></iframe>
     </div>
 
+    <!-- Messages -->
     <div id="messages"></div>
 
+    <!-- Twitch-style send area -->
     <div class="send-area">
       <input type="text" id="messageInput" placeholder="Type your message..." />
       <button id="sendBtn" class="btn">Send</button>
@@ -114,9 +117,9 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, setDoc, collection, query, where, getDocs, addDoc, orderBy, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* --- Firebase config --- */
+/* Firebase config */
 const firebaseConfig = {
   apiKey: "AIzaSyBLSE-HNfQ1ZOxUWBn8CK3VXyy6818cYe0",
   authDomain: "dbcr-c8e5c.firebaseapp.com",
@@ -134,87 +137,90 @@ const db = getFirestore(app);
 const signupBtn = document.getElementById("signupBtn");
 const signinBtn = document.getElementById("signinBtn");
 const signoutBtn = document.getElementById("signoutBtn");
+
 let currentUser = null;
 
 signupBtn.addEventListener("click", async () => {
   const email = document.getElementById("authEmail").value;
   const pass = document.getElementById("authPassword").value;
   const chatId = document.getElementById("authUsername").value.trim();
-  if(!chatId || chatId.length < 4) return alert("Chat ID must be at least 4 characters");
-  try{
-    const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-    await setDoc(doc(db, "users", userCredential.user.uid), { chatId, stars:0 });
-  }catch(e){alert(e.message);}
+
+  if(!chatId || chatId.length < 4) return alert("Chat ID must be at least 4 characters.");
+
+  // Check uniqueness
+  const usersRef = collection(db, "users");
+  const q = query(usersRef, where("chatId", "==", chatId));
+  const querySnap = await getDocs(q);
+  if(!querySnap.empty) return alert("Chat ID already exists.");
+
+  const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+  const user = userCredential.user;
+  await setDoc(doc(db, "users", user.uid), { chatId, email, stars: 0 });
 });
 
 signinBtn.addEventListener("click", async () => {
   const email = document.getElementById("authEmail").value;
   const pass = document.getElementById("authPassword").value;
-  try { await signInWithEmailAndPassword(auth, email, pass); } 
-  catch(e){alert(e.message);}
+  await signInWithEmailAndPassword(auth, email, pass);
 });
 
-signoutBtn.addEventListener("click", async () => {
+signoutBtn.addEventListener("click", async ()=>{
   await signOut(auth);
 });
 
-onAuthStateChanged(auth, async (user) => {
+onAuthStateChanged(auth, async user => {
   const profileName = document.getElementById("profileName");
   const uidEl = document.getElementById("uid");
-  const authBox = document.getElementById("authBox");
   if(user){
-    currentUser = { uid: user.uid };
-    // get chatId from Firestore
-    const userDoc = await getDoc(doc(db,"users",user.uid));
-    if(userDoc.exists()) currentUser.chatId = userDoc.data().chatId;
-    profileName.textContent = currentUser.chatId || "User";
+    const userDoc = await getDocs(query(collection(db,"users"), where("email","==",user.email)));
+    const chatId = userDoc.docs[0].data().chatId;
+    currentUser = { uid: user.uid, chatId };
+    profileName.textContent = chatId;
     uidEl.textContent = user.uid;
-    authBox.style.display = "none";
+    document.getElementById("authBox").style.display = "none";
     signoutBtn.style.display = "block";
-  }else{
+
+    // Load messages in real-time
+    const messagesRef = collection(db, "messages");
+    const messagesQuery = query(messagesRef, orderBy("timestamp","asc"));
+    onSnapshot(messagesQuery, snap=>{
+      const messagesEl = document.getElementById("messages");
+      messagesEl.innerHTML = "";
+      snap.forEach(doc=>{
+        const data = doc.data();
+        const msgEl = document.createElement("div");
+        msgEl.classList.add("msg");
+        if(data.chatId === currentUser.chatId) msgEl.classList.add("me");
+        msgEl.innerHTML = `<div class="meta">${data.chatId}</div><div class="content">${data.text}</div>`;
+        messagesEl.appendChild(msgEl);
+      });
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    });
+
+  } else {
     currentUser = null;
     profileName.textContent = "Guest";
     uidEl.textContent = "—";
-    authBox.style.display = "block";
+    document.getElementById("authBox").style.display = "block";
     signoutBtn.style.display = "none";
   }
 });
 
-/* --- Messages --- */
+/* --- Message system --- */
 const messageInput = document.getElementById("messageInput");
 const sendBtnEl = document.getElementById("sendBtn");
 const messagesEl = document.getElementById("messages");
 
-function addMessage(chatId, text){
-  const msgEl = document.createElement("div");
-  msgEl.classList.add("msg");
-  if(currentUser && chatId === currentUser.chatId) msgEl.classList.add("me");
-  msgEl.innerHTML = `<div class="meta">${chatId}</div><div class="content">${text}</div>`;
-  messagesEl.appendChild(msgEl);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-}
-
 sendBtnEl.addEventListener("click", async ()=>{
   const text = messageInput.value.trim();
   if(!text || !currentUser) return;
-  messageInput.value = "";
-  try{
-    await addDoc(collection(db,"messages"),{
-      chatId: currentUser.chatId,
-      text,
-      timestamp: serverTimestamp()
-    });
-  }catch(e){console.log(e);}
-});
 
-/* --- Firestore listener (stable) --- */
-const q = query(collection(db,"messages"), orderBy("timestamp"));
-onSnapshot(q, snap=>{
-  messagesEl.innerHTML = "";
-  snap.forEach(doc=>{
-    const { chatId, text } = doc.data();
-    addMessage(chatId,text);
+  await addDoc(collection(db,"messages"),{
+    chatId: currentUser.chatId,
+    text,
+    timestamp: serverTimestamp()
   });
+  messageInput.value = "";
 });
 
 /* --- Star system --- */
@@ -234,20 +240,8 @@ function showStarPopup(){
 closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
 
 // TEST: every 10 sec
-setInterval(async ()=>{
-  if(currentUser){
-    const userRef = doc(db,"users",currentUser.uid);
-    const userSnap = await getDoc(userRef);
-    stars = (userSnap.exists() ? userSnap.data().stars : 0) + 1;
-    await setDoc(userRef,{stars},{merge:true});
-    starCountEl.textContent = stars;
-    starText.innerHTML = `You've just earned +1 star! ⭐`;
-    starPopup.style.display="block";
-    setTimeout(()=>{starPopup.style.display="none";},2000);
-  }
-},10000);
+setInterval(showStarPopup,10000);
 
 </script>
-
 </body>
 </html>
