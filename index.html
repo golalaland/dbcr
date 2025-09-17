@@ -110,7 +110,7 @@ import {
   getAuth, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, onAuthStateChanged, signOut 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { 
-  getFirestore, doc, setDoc, collection, query, orderBy, serverTimestamp, addDoc, onSnapshot 
+  getFirestore, doc, setDoc, collection, query, orderBy, serverTimestamp, addDoc, onSnapshot, getDoc 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* Firebase config */
@@ -167,9 +167,11 @@ if(isSignInWithEmailLink(auth, window.location.href)){
     signInWithEmailLink(auth, email, window.location.href)
       .then(async userCred => {
         const user = userCred.user;
-        // Save user in Firestore if not exists
         const userDocRef = doc(db, "users", user.uid);
-        await setDoc(userDocRef, { chatId, email, stars:0 }, { merge:true });
+        const userSnap = await getDoc(userDocRef);
+        if(!userSnap.exists()){
+          await setDoc(userDocRef, { chatId, email, stars:0 });
+        }
         window.localStorage.removeItem('emailForSignIn');
         window.localStorage.removeItem('chatIdForSignIn');
       })
@@ -186,8 +188,8 @@ onAuthStateChanged(auth, async user=>{
   if(user){
     try{
       const userDocRef = doc(db,"users",user.uid);
-      const userSnap = await userDocRef.get();
-      currentUser = { uid:user.uid, chatId: (await userDocRef.get()).data().chatId };
+      const userSnap = await getDoc(userDocRef);
+      currentUser = { uid:user.uid, chatId: userSnap.data().chatId };
       profileName.textContent = currentUser.chatId;
       uidEl.textContent = user.uid;
 
@@ -262,6 +264,7 @@ function showStarPopup(){
 }
 closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
 setInterval(showStarPopup,10000);
+
 </script>
 </body>
 </html>
