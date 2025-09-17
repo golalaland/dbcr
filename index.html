@@ -24,14 +24,25 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 #authBox button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);color:var(--muted);padding:6px;border-radius:8px;}
 #authMsg{font-size:12px;color:#DFF41F;margin-top:6px;}
 #center{flex:1;display:flex;flex-direction:column;gap:6px;}
-#videoContainer{width:100%;aspect-ratio:16/9;background:#111;border-radius:12px;overflow:hidden;}
+#videoContainer{width:100%;aspect-ratio:16/9;background:#111;border-radius:12px;overflow:hidden;position:sticky;top:0;z-index:1;}
 #videoContainer iframe{width:100%;height:100%;border:0;border-radius:12px;}
-#messages{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:6px;border-radius:8px;background:#000;margin-bottom:6px;}
-.msg{padding:8px;border-radius:10px;background:var(--glass);max-width:75%;position:relative;opacity:0;animation:fadeInUp 0.25s forwards;}
-.msg .meta{font-size:11px;color:var(--muted);margin-bottom:4px;}
-.msg .content{font-size:13px;color:#fff;white-space:pre-wrap;}
-.msg.me{margin-left:auto;transition: transform 0.2s ease;}
-.msg.me.new{transform: scale(1.02); animation: popIn 0.2s forwards;}
+
+/* Messages */
+#messages{
+  flex:1; overflow:auto; padding:8px; display:flex; flex-direction:column; gap:4px;
+  border-radius:8px; background:#000; margin-bottom:6px;
+}
+.msg{
+  padding:4px 8px;
+  border-radius:8px;
+  background:var(--glass);
+  opacity:0;
+  animation:fadeInUp 0.25s forwards;
+  display:flex; flex-wrap:wrap; gap:4px; align-items:flex-start; max-width:80%;
+}
+.msg.me{ margin-left:auto; justify-content:flex-end; }
+.msg .username{ font-weight:700; color:var(--accent); }
+.msg .content{ color:#fff; white-space:pre-wrap; word-break:break-word; flex:1; }
 
 /* Send area */
 .send-area{
@@ -40,14 +51,14 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
   position:sticky;bottom:0;z-index:10;border-top:1px solid rgba(255,255,255,0.05);
   border-radius:20px;
 }
-.send-area input{
+.send-area textarea{
   flex:1;padding:10px 14px;border-radius:999px;
   border:1px solid rgba(255,255,255,0.1);
   background:#111;color:#fff;font-size:14px;outline:none;transition:0.2s all;
   resize:none;
 }
-.send-area input::placeholder{color:var(--muted);}
-.send-area input:focus{border-color:var(--accent);box-shadow:0 0 10px rgba(223,244,31,0.4);}
+.send-area textarea::placeholder{color:var(--muted);}
+.send-area textarea:focus{border-color:var(--accent);box-shadow:0 0 10px rgba(223,244,31,0.4);}
 .send-area button.btn{padding:8px 14px;border-radius:999px;background:var(--accent);color:#000;cursor:pointer;font-weight:600;transition:0.2s all;}
 .send-area button.btn:hover{filter:brightness(1.1);}
 
@@ -60,11 +71,10 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
   display:none;z-index:1000;color:var(--accent);font-size:12px;white-space:nowrap;text-align:center;max-width:90%;
 }
 @keyframes fadeInUp{to{opacity:1;transform:translateY(0);}}
-@keyframes popIn{from{transform:scale(0.95);opacity:0;}to{transform:scale(1);opacity:1;}}
 @media (max-width:600px){
   .send-area{padding:6px 8px;}
   .send-area button.btn{padding:6px 12px;font-size:13px;}
-  .send-area input{font-size:13px;padding:8px 12px;}
+  .send-area textarea{font-size:13px;padding:8px 12px;}
   .brand{font-size:24px;}
   .room-desc{font-size:11px;}
 }
@@ -149,149 +159,145 @@ let stars=0;
 function getGlowStyle(stars){
   let capped = Math.min(stars,500);
   if(capped<5) return "background: rgba(223,244,31,0.05); border:1px solid rgba(223,244,31,0.1);";
-  if(capped<10) return "background: rgba(223,244,31,0.08); border:1px solid rgba(223,244,31,0.15);";
-  if(capped<50) return "background: rgba(223,244,31,0.12); border:1px solid rgba(223,244,31,0.2);";
-  if(capped<200) return "background: rgba(223,244,31,0.18); border:1px solid rgba(223,244,31,0.25);";
-  if(capped<500) return "background: rgba(223,244,31,0.22); border:1px solid rgba(223,244,31,0.3);";
-  return "background: rgba(223,244,31,0.28); border:1px solid rgba(223,244,31,0.4); box-shadow:0 0 8px rgba(223,244,31,0.5);";
+  if(capped<10) return "background: rgba(223,244,31,0.08); border:1px solid rgba(223,244,31,0.2);";
+  return "background: rgba(223,244,31,0.1); border:1px solid rgba(223,244,31,0.3); box-shadow:0 0 6px rgba(223,244,31,0.5);";
 }
 
-/* Send login link */
+function showError(msg){ authMsg.textContent=msg; }
+
+/* SEND LOGIN LINK */
 sendLinkBtn.addEventListener("click", async()=>{
-  const email = document.getElementById("authEmail").value.trim();
-  const chatId = document.getElementById("authUsername").value.trim();
-  if(!chatId || chatId.length<4){ authMsg.textContent="Chat ID must be ≥4 chars"; return; }
+  const email=document.getElementById("authEmail").value.trim();
+  const chatId=document.getElementById("authUsername").value.trim();
+  if(!chatId || chatId.length<4) return showError("Chat ID must be at least 4 characters.");
+  if(!email) return showError("Email required.");
 
-  // check if chatId exists
-  const usersRef = collection(db,"users");
-  const q = query(usersRef, where("chatId","==",chatId));
-  const snap = await getDocs(q);
-
-  if(!snap.empty){
-    const existing = snap.docs[0].data();
-    if(existing.email !== email){ authMsg.textContent="Sorry, chat ID is already taken"; return; }
-  }
-
-  const actionCodeSettings = {url:window.location.href, handleCodeInApp:true};
   try{
+    // Check if chatId exists
+    const usersRef = collection(db,"users");
+    const q = query(usersRef,where("chatId","==",chatId));
+    const snap = await getDocs(q);
+    if(!snap.empty){
+      let docData = snap.docs[0].data();
+      if(docData.email!==email) return showError("Sorry, chat ID is already taken.");
+    }
+
+    const actionCodeSettings = {
+      url: window.location.href,
+      handleCodeInApp: true
+    };
     await sendSignInLinkToEmail(auth,email,actionCodeSettings);
-    authMsg.textContent="Check your email for login link!";
-    window.localStorage.setItem('emailForSignIn',email);
-    window.localStorage.setItem('chatIdForSignIn',chatId);
-  }catch(err){ authMsg.textContent=err.message; }
+    window.localStorage.setItem("emailForSignIn",email);
+    showError("Login link sent! Check your email.");
+  }catch(err){ showError(err.message); }
 });
 
-/* Complete login if coming from magic link */
+/* Check if coming from email link */
 if(isSignInWithEmailLink(auth,window.location.href)){
-  let email = window.localStorage.getItem('emailForSignIn');
-  if(!email) email = prompt("Enter your email to confirm");
-  signInWithEmailLink(auth,email,window.location.href)
-  .then(async result=>{
-    const chatId = window.localStorage.getItem('chatIdForSignIn');
-    const user = result.user;
-    await setDoc(doc(db,"users",user.uid), {chatId,email,stars:0},{merge:true});
-    window.localStorage.removeItem('emailForSignIn');
-    window.localStorage.removeItem('chatIdForSignIn');
-  }).catch(err=>{authMsg.textContent="Login failed";console.error(err)});
+  let email=window.localStorage.getItem("emailForSignIn");
+  if(!email){
+    email=prompt("Please provide your email for confirmation");
+  }
+  signInWithEmailLink(auth,email,window.location.href).then(async(userCredential)=>{
+    const user=userCredential.user;
+    const chatId=document.getElementById("authUsername").value.trim();
+    const userDocRef=doc(db,"users",user.uid);
+    const snap=await getDoc(userDocRef);
+    if(!snap.exists()){
+      await setDoc(userDocRef,{chatId,email,stars:0});
+    }
+    window.localStorage.removeItem("emailForSignIn");
+    authMsg.textContent="Signed in!";
+  }).catch(err=>showError(err.message));
 }
 
 /* AUTH STATE CHANGE */
-onAuthStateChanged(auth, async user=>{
-  const profileName = document.getElementById("profileName");
-  const uidEl = document.getElementById("uid");
-  const starCountEl = document.getElementById("starCount");
-  const authBox = document.getElementById("authBox");
+onAuthStateChanged(auth,async(user)=>{
+  const profileName=document.getElementById("profileName");
+  const uidEl=document.getElementById("uid");
+  const authBox=document.getElementById("authBox");
 
   if(user){
-    const userDocRef = doc(db,"users",user.uid);
-    const userSnap = await getDoc(userDocRef);
-    if(!userSnap.exists()) throw new Error("User not found");
-    stars = userSnap.data().stars || 0;
-    currentUser = { uid:user.uid, chatId:userSnap.data().chatId };
+    const userDocRef=doc(db,"users",user.uid);
+    const userSnap=await getDoc(userDocRef);
+    if(!userSnap.exists()) return showError("User record missing");
+    currentUser={uid:user.uid, chatId:userSnap.data().chatId};
+    stars=userSnap.data().stars||0;
+
     profileName.textContent=currentUser.chatId;
-    uidEl.textContent=user.uid;
-    starCountEl.textContent=stars;
+    uidEl.textContent=currentUser.uid;
+    document.getElementById("starCount").textContent=stars;
+
     authBox.style.display="none";
     signoutBtn.style.display="block";
 
     // Load messages
     const messagesRef = collection(db,"messages");
-    const messagesQuery = query(messagesRef, orderBy("timestamp","asc"));
-    onSnapshot(messagesQuery, snap=>{
-      const messagesEl = document.getElementById("messages");
+    const messagesQuery = query(messagesRef,orderBy("timestamp","asc"));
+    onSnapshot(messagesQuery,snap=>{
+      const messagesEl=document.getElementById("messages");
       messagesEl.innerHTML="";
       snap.forEach(doc=>{
         const data=doc.data();
         const msgEl=document.createElement("div");
         msgEl.classList.add("msg");
-        if(data.chatId===currentUser.chatId){
-          msgEl.classList.add("me","new");
-          setTimeout(()=>msgEl.classList.remove("new"),500);
-          msgEl.style.cssText += getGlowStyle(stars);
-        }
-        msgEl.innerHTML=`<div class="meta">${data.chatId}</div><div class="content">${data.text}</div>`;
+        if(data.chatId===currentUser.chatId) msgEl.classList.add("me");
+        msgEl.innerHTML=`<span class="username">${data.chatId}:</span> <span class="content">${data.text}</span>`;
         messagesEl.appendChild(msgEl);
       });
-      messagesEl.scrollTo({top:messagesEl.scrollHeight,behavior:'smooth'});
+      messagesEl.scrollTop=messagesEl.scrollHeight;
     });
 
-  } else {
-    currentUser=null; stars=0;
-    profileName.textContent="Guest"; uidEl.textContent="—";
-    authBox.style.display="block"; signoutBtn.style.display="none";
+  }else{
+    currentUser=null;
+    profileName.textContent="Guest";
+    uidEl.textContent="—";
+    authBox.style.display="block";
+    signoutBtn.style.display="none";
   }
 });
 
 /* SIGN OUT */
-signoutBtn.addEventListener("click", async()=>{ try{ await signOut(auth); } catch(err){console.error(err);} });
+signoutBtn.addEventListener("click",async()=>{ try{await signOut(auth);}catch(err){showError(err.message);} });
 
 /* SEND MESSAGE */
 async function sendMessage(){
-  const text = messageInput.value.trim();
-  if(!text || !currentUser) return;
+  if(!currentUser) return;
+  const text=messageInput.value.trim();
+  if(!text) return;
   try{
-    await addDoc(collection(db,"messages"), {chatId:currentUser.chatId,text,timestamp:serverTimestamp()});
-    messageInput.value=''; messageInput.style.height='auto';
-  } catch(err){ console.error(err); }
+    await addDoc(collection(db,"messages"),{
+      chatId:currentUser.chatId,
+      text,
+      timestamp:serverTimestamp()
+    });
+    messageInput.value="";
+  }catch(err){ console.error(err); }
 }
-
-/* Auto-expand textarea */
-messageInput.addEventListener('input',()=>{
-  messageInput.style.height='auto';
-  messageInput.style.height=messageInput.scrollHeight+'px';
+sendBtnEl.addEventListener("click",sendMessage);
+messageInput.addEventListener("keydown",e=>{
+  if(e.key==="Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
 
-/* Enter/Shift+Enter */
-messageInput.addEventListener('keydown', e=>{
-  if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); sendMessage(); }
-});
-sendBtnEl.addEventListener('click', sendMessage);
+/* AUTO RESIZE TEXTAREA */
+messageInput.addEventListener("input",()=>{messageInput.style.height="auto";messageInput.style.height=messageInput.scrollHeight+"px";});
 
 /* STAR SYSTEM */
-const starPopup = document.getElementById("starPopup");
-const starText = document.getElementById("starText");
-const closeStarBtn = document.getElementById("closeStar");
-
-async function showStarPopup(){
+const starCountEl=document.getElementById("starCount");
+const starPopup=document.getElementById("starPopup");
+const starText=document.getElementById("starText");
+const closeStarBtn=document.getElementById("closeStar");
+function showStarPopup(){
   if(!currentUser) return;
-  const userDocRef = doc(db,"users",currentUser.uid);
-  try{
-    await runTransaction(db, async transaction=>{
-      const userSnap = await transaction.get(userDocRef);
-      if(!userSnap.exists()) throw new Error("User not found");
-      const newStars = (userSnap.data().stars || 0)+1;
-      transaction.update(userDocRef,{stars:newStars});
-      stars=newStars;
-      document.getElementById("starCount").textContent=stars;
-      starText.innerHTML=`You've just earned +1 star! ⭐`;
-      starPopup.style.display="block";
-      setTimeout(()=>{starPopup.style.display="none";},3000);
-    });
-  }catch(err){ console.error(err); }
+  stars+=1;
+  starCountEl.textContent=stars;
+  starText.innerHTML=`You've just earned +1 star! ⭐`;
+  starPopup.style.display="block";
+  setDoc(doc(db,"users",currentUser.uid),{stars},{merge:true}); // persist stars
+  setTimeout(()=>{starPopup.style.display="none";},3000);
 }
 closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
 setInterval(showStarPopup,10000);
-
 </script>
 </body>
 </html>
