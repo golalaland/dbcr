@@ -70,7 +70,7 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
   <div class="room-desc">Money Talk 💸 — Chat. Own your vibe.</div>
 
   <div id="authBox">
-    <input type="text" id="authUsername" placeholder="Chat ID" />
+    <input type="text" id="authUsername" placeholder="Choose a Chat ID (≥4 chars)" />
     <input type="email" id="authEmail" placeholder="Email" />
     <div class="controls-row">
       <button id="sendLinkBtn" class="btn">Send Login Link</button>
@@ -132,11 +132,25 @@ const signoutBtn = document.getElementById("signoutBtn");
 const authMsg = document.getElementById("authMsg");
 
 let currentUser = null;
+let stars = 0;
 
 function showError(err){
   console.error(err);
   authMsg.textContent = err.message || "Something went wrong";
 }
+
+/* AUTO-RELEASE EXPIRED CHAT ID RESERVATIONS */
+async function cleanExpiredChatIds(){
+  const now = Date.now();
+  const chatIdsSnap = await getDoc(collection(db,"chatIds"));
+  chatIdsSnap.forEach(async docSnap=>{
+    const data = docSnap.data();
+    if(data.reserved && data.timestamp && (now - data.timestamp.toMillis()) > 10*60*1000){
+      await setDoc(doc(db,"chatIds",docSnap.id), { reserved:false }, { merge:true });
+    }
+  });
+}
+setInterval(cleanExpiredChatIds,5*60*1000); // every 5 min
 
 /* SEND MAGIC LINK WITH UNIQUE CHAT ID CHECK */
 sendLinkBtn.addEventListener("click", async () => {
@@ -149,7 +163,7 @@ sendLinkBtn.addEventListener("click", async () => {
   try {
     await runTransaction(db, async (transaction) => {
       const snap = await getDoc(doc(db,"chatIds",chatId));
-      if(snap.exists()) throw new Error("Chat ID already taken");
+      if(snap.exists() && snap.data().reserved) throw new Error("Chat ID already taken");
       transaction.set(doc(db,"chatIds",chatId), { reserved:true, timestamp:serverTimestamp() });
     });
 
@@ -165,24 +179,17 @@ sendLinkBtn.addEventListener("click", async () => {
 
 /* HANDLE EMAIL LINK SIGN-IN */
 if(isSignInWithEmailLink(auth, window.location.href)){
-  const email = window.localStorage.getItem('emailForSignIn');
+  let email = window.localStorage.getItem('emailForSignIn');
   const chatId = window.localStorage.getItem('chatIdForSignIn');
-  if(email){
-    signInWithEmailLink(auth, email, window.location.href)
-      .then(async userCred => {
-        const user = userCred.user;
-        const userDocRef = doc(db,"users",user.uid);
-        const userSnap = await getDoc(userDocRef);
-        if(!userSnap.exists()){
-          await setDoc(userDocRef, { chatId, email, stars:0 });
-          // Optional: delete the reservation after successful signup
-          await setDoc(doc(db,"chatIds",chatId), { reserved:false }, { merge:true });
-        }
-        window.localStorage.removeItem('emailForSignIn');
-        window.localStorage.removeItem('chatIdForSignIn');
-      })
-      .catch(err => showError(err));
-  }
+
+  if(!email) email = prompt("Enter your email to complete login");
+
+  signInWithEmailLink(auth,email,window.location.href).then(async result=>{
+    const user = result.user;
+    await setDoc(doc(db,"users",user.uid), { chatId,email,stars:0 }, { merge:true });
+    window.localStorage.removeItem('emailForSignIn');
+    window.localStorage.removeItem('chatIdForSignIn');
+  }).catch(showError);
 }
 
 /* AUTH STATE CHANGE */
@@ -195,12 +202,14 @@ onAuthStateChanged(auth, async user=>{
     try{
       const userDocRef = doc(db,"users",user.uid);
       const userSnap = await getDoc(userDocRef);
-      if(!userSnap.exists()){ throw new Error("User record not found"); }
+      if(!userSnap.exists()) throw new Error("User not found");
 
       const chatId = userSnap.data().chatId;
+      stars = userSnap.data().stars || 0;
       currentUser = { uid:user.uid, chatId };
       profileName.textContent = chatId;
       uidEl.textContent = user.uid;
+      document.getElementById("starCount").textContent = stars;
 
       authBox.style.display = "none";
       signoutBtn.style.display = "block";
@@ -222,10 +231,10 @@ onAuthStateChanged(auth, async user=>{
         messagesEl.scrollTop = messagesEl.scrollHeight;
       });
 
-    }catch(err){ showError(err); }
+    } catch(err){ showError(err); }
 
-  }else{
-    currentUser=null;
+  } else {
+    currentUser = null;
     profileName.textContent="Guest";
     uidEl.textContent="—";
     authBox.style.display="block";
@@ -238,7 +247,7 @@ signoutBtn.addEventListener("click", async ()=>{
   try{ await signOut(auth); } catch(err){ showError(err); }
 });
 
-/* MESSAGES */
+/* SEND MESSAGE */
 const messageInput = document.getElementById("messageInput");
 const sendBtnEl = document.getElementById("sendBtn");
 
@@ -252,28 +261,42 @@ async function sendMessage(){
       timestamp:serverTimestamp()
     });
     messageInput.value="";
-  }catch(err){ console.error(err); }
+  } catch(err){ console.error(err); }
 }
 
 sendBtnEl.addEventListener("click",sendMessage);
 messageInput.addEventListener("keydown",e=>{ if(e.key==="Enter") sendMessage(); });
 
-/* STAR SYSTEM */
-let stars=0;
+/* STAR SYSTEM WITH FIRESTORE SYNC */
 const starCountEl = document.getElementById("starCount");
 const starPopup = document.getElementById("starPopup");
 const starText = document.getElementById("starText");
 const closeStarBtn = document.getElementById("closeStar");
 
-function showStarPopup(){
-  stars+=1;
-  starCountEl.textContent=stars;
-  starText.innerHTML=`You've just earned +1 star! ⭐`;
-  starPopup.style.display="block";
-  setTimeout(()=>{starPopup.style.display="none";},3000);
+async function showStarPopup(){
+  if(!currentUser) return;
+  const userDocRef = doc(db,"users",currentUser.uid);
+
+  try{
+    await runTransaction(db, async transaction=>{
+      const userSnap = await transaction.get(userDocRef);
+      if(!userSnap.exists()) throw new Error("User not found");
+
+      const newStars = (userSnap.data().stars || 0) + 1;
+      transaction.update(userDocRef, { stars:newStars });
+
+      stars = newStars;
+      starCountEl.textContent = stars;
+      starText.innerHTML=`You've just earned +1 star! ⭐`;
+      starPopup.style.display="block";
+      setTimeout(()=>{starPopup.style.display="none";},3000);
+    });
+  } catch(err){ console.error(err); }
 }
+
 closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
 setInterval(showStarPopup,10000);
+
 </script>
 </body>
 </html>
