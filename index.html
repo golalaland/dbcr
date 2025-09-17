@@ -70,14 +70,11 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
   <div class="brand">乂丨乂丨</div>
   <div class="room-desc">Money Talk 💸 — Chat. Own your vibe.</div>
 
-  <!-- Auth: original design preserved -->
+  <!-- Auth -->
   <div id="authBox">
-    <input type="text" id="authUsername" placeholder="Chat ID" />
     <input type="email" id="authEmail" placeholder="Email" />
-    <input type="password" id="authPassword" placeholder="Password" />
     <div class="controls-row">
-      <button id="signinBtn" class="btn">Sign in</button>
-      <button id="signupBtn" class="ghost">Sign up</button>
+      <button id="sendLinkBtn" class="btn">Send Login Link</button>
       <button id="signoutBtn" class="ghost" style="display:none">Sign out</button>
     </div>
     <div id="authMsg" class="small-ghost" style="margin-top:6px"></div>
@@ -85,15 +82,12 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 
   <!-- Center panel: Video + Chat -->
   <div id="center">
-    <!-- Video Embed -->
     <div id="videoContainer">
       <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="Video" allowfullscreen></iframe>
     </div>
 
-    <!-- Messages -->
     <div id="messages"></div>
 
-    <!-- Twitch-style send area -->
     <div class="send-area">
       <input type="text" id="messageInput" placeholder="Type your message..." />
       <button id="sendBtn" class="btn">Send</button>
@@ -108,7 +102,6 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
   </div>
 </div>
 
-<!-- Star popup -->
 <div class="star-popup" id="starPopup">
   <div id="starText">You've just earned +1 star! ⭐</div>
   <div style="text-align:right;margin-top:6px"><button id="closeStar" class="ghost">Close</button></div>
@@ -117,12 +110,10 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { 
-  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, 
-  onAuthStateChanged, signOut 
+  getAuth, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, onAuthStateChanged, signOut 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { 
-  getFirestore, doc, setDoc, collection, query, where, getDocs, addDoc, 
-  orderBy, serverTimestamp, onSnapshot 
+  getFirestore, doc, setDoc, getDoc, collection, query, orderBy, serverTimestamp, addDoc, onSnapshot 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* Firebase config */
@@ -139,155 +130,113 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-/* --- Auth --- */
-const signupBtn = document.getElementById("signupBtn");
-const signinBtn = document.getElementById("signinBtn");
+const sendLinkBtn = document.getElementById("sendLinkBtn");
 const signoutBtn = document.getElementById("signoutBtn");
 const authMsg = document.getElementById("authMsg");
 
 let currentUser = null;
 
-async function displayError(err){
+function showError(err){
   console.error(err);
-  authMsg.textContent = err.message || "Something went wrong.";
+  authMsg.textContent = err.message || "Something went wrong";
 }
 
-// SIGN UP
-signupBtn.addEventListener("click", async () => {
+/* SEND MAGIC LINK */
+sendLinkBtn.addEventListener("click", async () => {
   const email = document.getElementById("authEmail").value.trim();
-  const pass = document.getElementById("authPassword").value;
-  const chatId = document.getElementById("authUsername").value.trim();
+  if (!email) return alert("Enter your email");
 
-  if(!chatId || chatId.length < 4) return alert("Chat ID must be at least 4 characters.");
+  const actionCodeSettings = {
+    url: window.location.href,
+    handleCodeInApp: true
+  };
 
-  try{
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("chatId", "==", chatId));
-    const querySnap = await getDocs(q);
-    if(!querySnap.empty) return alert("Chat ID already exists.");
-
-    const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-    const user = userCredential.user;
-    await setDoc(doc(db, "users", user.uid), { chatId, email, stars: 0 });
-  }catch(err){
-    displayError(err);
+  try {
+    await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+    window.localStorage.setItem('emailForSignIn', email);
+    alert("Check your email for the login link!");
+  } catch(err) {
+    showError(err);
   }
 });
 
-// SIGN IN
-signinBtn.addEventListener("click", async () => {
-  const email = document.getElementById("authEmail").value.trim();
-  const pass = document.getElementById("authPassword").value;
+/* HANDLE MAGIC LINK ON LOAD */
+window.addEventListener('load', async () => {
+  if (isSignInWithEmailLink(auth, window.location.href)) {
+    let email = window.localStorage.getItem('emailForSignIn');
+    if (!email) email = window.prompt('Please enter your email to confirm login');
 
-  try{
-    await signInWithEmailAndPassword(auth, email, pass);
-  }catch(err){
-    displayError(err);
+    try {
+      const result = await signInWithEmailLink(auth, email, window.location.href);
+      const user = result.user;
+
+      // Firestore user record
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        // First-time login → create chatId based on email
+        await setDoc(userRef, { chatId: email.split('@')[0], email, stars: 0 });
+      } else {
+        // Returning user → update last login
+        await setDoc(userRef, { lastLogin: new Date() }, { merge: true });
+      }
+
+      window.localStorage.removeItem('emailForSignIn');
+      alert("Logged in successfully!");
+    } catch(err) {
+      showError(err);
+    }
   }
 });
 
-// SIGN OUT
-signoutBtn.addEventListener("click", async ()=>{
-  try{
-    await signOut(auth);
-  }catch(err){
-    displayError(err);
-  }
-});
-
-// AUTH STATE CHANGE
-onAuthStateChanged(auth, async user => {
+/* AUTH STATE CHANGE */
+onAuthStateChanged(auth, async user=>{
   const profileName = document.getElementById("profileName");
   const uidEl = document.getElementById("uid");
   const authBox = document.getElementById("authBox");
 
   if(user){
-    const userDocSnap = await getDocs(query(collection(db,"users"), where("email","==",user.email)));
-    if(userDocSnap.empty) return;
+    try{
+      const userDocRef = doc(db,"users",user.uid);
+      const userSnap = await getDoc(userDocRef);
+      if(!userSnap.exists()){ throw new Error("User record not found"); }
 
-    const chatId = userDocSnap.docs[0].data().chatId;
-    currentUser = { uid: user.uid, chatId };
-    profileName.textContent = chatId;
-    uidEl.textContent = user.uid;
+      const chatId = userSnap.data().chatId;
+      currentUser = { uid:user.uid, chatId };
+      profileName.textContent = chatId;
+      uidEl.textContent = user.uid;
 
-    authBox.style.display = "none";
-    signoutBtn.style.display = "block";
+      authBox.style.display = "none";
+      signoutBtn.style.display = "block";
 
-    const messagesRef = collection(db, "messages");
-    const messagesQuery = query(messagesRef, orderBy("timestamp","asc"));
-
-    onSnapshot(messagesQuery, snap=>{
-      const messagesEl = document.getElementById("messages");
-      messagesEl.innerHTML = "";
-      snap.forEach(doc=>{
-        const data = doc.data();
-        const msgEl = document.createElement("div");
-        msgEl.classList.add("msg");
-        if(data.chatId === currentUser.chatId) msgEl.classList.add("me");
-        msgEl.innerHTML = `<div class="meta">${data.chatId}</div><div class="content">${data.text}</div>`;
-        messagesEl.appendChild(msgEl);
+      // Load messages
+      const messagesRef = collection(db,"messages");
+      const messagesQuery = query(messagesRef,orderBy("timestamp","asc"));
+      onSnapshot(messagesQuery,snap=>{
+        const messagesEl = document.getElementById("messages");
+        messagesEl.innerHTML="";
+        snap.forEach(doc=>{
+          const data = doc.data();
+          const msgEl = document.createElement("div");
+          msgEl.classList.add("msg");
+          if(data.chatId===currentUser.chatId) msgEl.classList.add("me");
+          msgEl.innerHTML=`<div class="meta">${data.chatId}</div><div class="content">${data.text}</div>`;
+          messagesEl.appendChild(msgEl);
+        });
+        messagesEl.scrollTop = messagesEl.scrollHeight;
       });
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    });
 
-    // Focus input automatically
-    document.getElementById("messageInput").focus();
+    }catch(err){ showError(err); }
 
-  } else {
-    currentUser = null;
-    profileName.textContent = "Guest";
-    uidEl.textContent = "—";
-    authBox.style.display = "block";
-    signoutBtn.style.display = "none";
+  }else{
+    currentUser=null;
+    profileName.textContent="Guest";
+    uidEl.textContent="—";
+    authBox.style.display="block";
+    signoutBtn.style.display="none";
   }
 });
 
-/* --- Message system --- */
-const messageInput = document.getElementById("messageInput");
-const sendBtnEl = document.getElementById("sendBtn");
-
-async function sendMessage(){
-  const text = messageInput.value.trim();
-  if(!text || !currentUser) return;
-
-  try{
-    await addDoc(collection(db,"messages"),{
-      chatId: currentUser.chatId,
-      text,
-      timestamp: serverTimestamp()
-    });
-    messageInput.value = "";
-  }catch(err){
-    console.error(err);
-  }
-}
-
-sendBtnEl.addEventListener("click", sendMessage);
-
-// ENTER key to send
-messageInput.addEventListener("keydown", e=>{
-  if(e.key === "Enter") sendMessage();
-});
-
-/* --- Star system --- */
-let stars = 0;
-const starCountEl = document.getElementById("starCount");
-const starPopup = document.getElementById("starPopup");
-const starText = document.getElementById("starText");
-const closeStarBtn = document.getElementById("closeStar");
-
-function showStarPopup(){
-  stars += 1;
-  starCountEl.textContent = stars;
-  starText.innerHTML = `You've just earned +1 star! ⭐`;
-  starPopup.style.display = "block";
-  setTimeout(()=>{starPopup.style.display="none";},3000);
-}
-closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
-
-// TEST: every 10 sec
-setInterval(showStarPopup,10000);
-
-</script>
-</body>
-</html>
+/* SIGN OUT */
+signoutBtn.addEventListener("click", async ()=>{
