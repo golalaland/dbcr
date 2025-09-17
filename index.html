@@ -72,7 +72,7 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 
   <!-- Auth -->
   <div id="authBox">
-    <input type="text" id="authUsername" placeholder="Chat ID" />
+    <input type="text" id="authUsername" placeholder="Choose a Chat ID (unique, ≥4 chars)" />
     <input type="email" id="authEmail" placeholder="Email" />
     <div class="controls-row">
       <button id="sendLinkBtn" class="btn">Send Login Link</button>
@@ -131,7 +131,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-
 const sendLinkBtn = document.getElementById("sendLinkBtn");
 const signoutBtn = document.getElementById("signoutBtn");
 const authMsg = document.getElementById("authMsg");
@@ -147,45 +146,47 @@ function showError(err){
 sendLinkBtn.addEventListener("click", async () => {
   const email = document.getElementById("authEmail").value.trim();
   const chatId = document.getElementById("authUsername").value.trim();
-
+  
   if(!email) return alert("Enter your email");
   if(!chatId || chatId.length < 4) return alert("Chat ID must be at least 4 characters.");
 
-  // Check uniqueness of chatId
-  const usersRef = collection(db, "users");
-  const q = query(usersRef, where("chatId", "==", chatId));
-  const querySnap = await getDocs(q);
-  if (!querySnap.empty) return alert("Chat ID already taken. Choose another.");
-
-  const actionCodeSettings = {
-    url: window.location.href,
-    handleCodeInApp: true
-  };
-
   try {
+    // Check if Chat ID exists
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("chatId", "==", chatId));
+    const querySnap = await getDocs(q);
+    if (!querySnap.empty) return alert("Chat ID already taken. Choose another.");
+
+    const actionCodeSettings = {
+      url: window.location.href,
+      handleCodeInApp: true
+    };
+
     await sendSignInLinkToEmail(auth, email, actionCodeSettings);
     window.localStorage.setItem('emailForSignIn', email);
     window.localStorage.setItem('chatIdForSignIn', chatId);
     alert("Magic link sent! Check your email to log in.");
-  } catch (err) { showError(err); }
+  } catch(err) { showError(err); }
 });
 
 /* AUTO-SIGN IN WITH LINK */
 if (isSignInWithEmailLink(auth, window.location.href)) {
-  let email = window.localStorage.getItem('emailForSignIn');
-  let chatId = window.localStorage.getItem('chatIdForSignIn');
-  if (!email) email = prompt('Enter your email to confirm sign-in');
-  try {
-    const result = await signInWithEmailLink(auth, email, window.location.href);
-    const user = result.user;
-    const userRef = doc(db, "users", user.uid);
-    const userSnap = await getDoc(userRef);
-    if (!userSnap.exists()) {
-      await setDoc(userRef, { chatId, email, stars: 0 });
-    }
-    window.localStorage.removeItem('emailForSignIn');
-    window.localStorage.removeItem('chatIdForSignIn');
-  } catch (err) { showError(err); }
+  (async ()=>{
+    let email = window.localStorage.getItem('emailForSignIn');
+    let chatId = window.localStorage.getItem('chatIdForSignIn');
+    if (!email) email = prompt('Enter your email to confirm sign-in');
+    try {
+      const result = await signInWithEmailLink(auth, email, window.location.href);
+      const user = result.user;
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) {
+        await setDoc(userRef, { chatId, email, stars: 0 });
+      }
+      window.localStorage.removeItem('emailForSignIn');
+      window.localStorage.removeItem('chatIdForSignIn');
+    } catch(err){ showError(err); }
+  })();
 }
 
 /* SIGN OUT */
