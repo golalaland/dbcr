@@ -22,50 +22,41 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 #authBox .controls-row{display:flex;gap:6px;margin-top:6px;}
 #authBox button.btn{background:var(--accent);color:#000;border:0;padding:6px 10px;border-radius:8px;cursor:pointer;}
 #authBox button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);color:var(--muted);padding:6px;border-radius:8px;}
-#authMsg{font-size:12px;color:#DFF41F;margin-top:6px;}
 #center{flex:1;display:flex;flex-direction:column;gap:6px;}
-#videoContainer{width:100%;aspect-ratio:16/9;background:#111;border-radius:12px;overflow:hidden;position:sticky;top:0;z-index:5;}
+#videoContainer{width:100%;aspect-ratio:16/9;background:#111;border-radius:12px;overflow:hidden;}
 #videoContainer iframe{width:100%;height:100%;border:0;border-radius:12px;}
-#messages{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:4px;border-radius:8px;background:#000;margin-bottom:6px;font-size:13px;}
-.msg{padding:6px 8px;border-radius:10px;max-width:75%;position:relative;opacity:0;animation:fadeInUp 0.25s forwards;word-break:break-word;}
-.msg .meta{font-weight:700;margin-right:4px;}
+#messages{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:6px;border-radius:8px;background:#000;margin-bottom:6px;}
+.msg{padding:8px;border-radius:10px;background:var(--glass);max-width:75%;position:relative;opacity:0;animation:fadeInUp 0.25s forwards;}
 .msg.me{margin-left:auto;background:rgba(223,244,31,0.08);}
+.msg .meta{font-size:11px;color:var(--muted);margin-bottom:4px;}
+.msg .content{font-size:13px;color:#fff;white-space:pre-wrap;}
 .send-area{
-  display:flex;align-items:flex-end;gap:6px;
+  display:flex;align-items:center;gap:6px;
   background:var(--card);padding:6px 12px;
   position:sticky;bottom:0;z-index:10;border-top:1px solid rgba(255,255,255,0.05);
   border-radius:20px;
 }
-.send-area textarea{
-  flex:1;padding:10px 14px;border-radius:12px;
+.send-area input{
+  flex:1;padding:10px 14px;border-radius:999px;
   border:1px solid rgba(255,255,255,0.1);
   background:#111;color:#fff;font-size:14px;outline:none;transition:0.2s all;
-  resize:none;overflow:auto;
 }
-.send-area textarea::placeholder{color:var(--muted);}
-.send-area textarea:focus{border-color:var(--accent);box-shadow:0 0 10px rgba(223,244,31,0.4);}
-.send-area button.btn{padding:8px 14px;border-radius:12px;background:var(--accent);color:#000;cursor:pointer;font-weight:600;transition:0.2s all;}
+.send-area input::placeholder{color:var(--muted);}
+.send-area input:focus{border-color:var(--accent);box-shadow:0 0 10px rgba(223,244,31,0.4);}
+.send-area button.btn{padding:8px 14px;border-radius:999px;background:var(--accent);color:#000;cursor:pointer;font-weight:600;transition:0.2s all;}
 .send-area button.btn:hover{filter:brightness(1.1);}
-.profile{display:flex;justify-content:space-between;align-items:center;margin-top:12px;}
-.profile .stars-display{display:flex;flex-direction:column;gap:4px;}
+.profile{display:flex;flex-direction:column;gap:4px;margin-top:12px;}
 .profile .small{font-size:12px;color:var(--muted);}
-#redeemStarsBtn{
-  background: var(--accent);
-  color: #000;
-  border: none;
-  border-radius: 8px;
-  padding: 6px 12px;
-  cursor: pointer;
-  font-weight:600;
-  text-decoration:none;
+.star-popup{
+  position:fixed;left:50%;top:18%;transform:translateX(-50%);
+  background:var(--card);padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);
+  display:none;z-index:1000;color:var(--accent);font-size:12px;white-space:nowrap;text-align:center;max-width:90%;
 }
-#redeemStarsBtn:hover{ filter: brightness(1.2); }
-
 @keyframes fadeInUp{to{opacity:1;transform:translateY(0);}}
 @media (max-width:600px){
   .send-area{padding:6px 8px;}
   .send-area button.btn{padding:6px 12px;font-size:13px;}
-  .send-area textarea{font-size:13px;padding:8px 12px;}
+  .send-area input{font-size:13px;padding:8px 12px;}
   .brand{font-size:24px;}
   .room-desc{font-size:11px;}
 }
@@ -74,6 +65,8 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 <body>
 
 <div class="app">
+
+  <!-- Brand + Room Description -->
   <div class="brand">乂丨乂丨</div>
   <div class="room-desc">Money Talk 💸 — Chat. Own your vibe.</div>
 
@@ -81,13 +74,16 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
   <div id="authBox">
     <input type="text" id="authUsername" placeholder="Chat ID" />
     <input type="email" id="authEmail" placeholder="Email" />
+    <input type="password" id="authPassword" placeholder="Password" />
     <div class="controls-row">
-      <button id="sendLoginLinkBtn" class="btn">Send Login Link</button>
-      <div id="authMsg"></div>
+      <button id="signinBtn" class="btn">Sign in</button>
+      <button id="signupBtn" class="ghost">Sign up</button>
+      <button id="signoutBtn" class="ghost" style="display:none">Sign out</button>
     </div>
+    <div id="authMsg" class="small-ghost" style="margin-top:6px"></div>
   </div>
 
-  <!-- Center panel -->
+  <!-- Center panel: Video + Chat -->
   <div id="center">
     <div id="videoContainer">
       <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="Video" allowfullscreen></iframe>
@@ -96,32 +92,31 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
     <div id="messages"></div>
 
     <div class="send-area">
-      <textarea id="messageInput" placeholder="Type your message..." rows="1"></textarea>
+      <input type="text" id="messageInput" placeholder="Type your message..." />
       <button id="sendBtn" class="btn">Send</button>
     </div>
   </div>
 
+  <!-- Profile -->
   <div class="profile">
-    <div class="stars-display">
-      <strong id="profileName">Guest</strong>
-      <div class="small">Stars: <span id="starCount">0</span> ⭐</div>
-      <div class="small">Amount: $<span id="dollarCount">0.00000</span></div>
-    </div>
-    <a id="redeemStarsBtn" href="https://xixi.live" target="_blank">Redeem Stars</a>
+    <strong id="profileName">Guest</strong>
+    <div class="small">Stars: <span id="starCount">0</span> ⭐</div>
+    <div class="small">UID: <span id="uid">—</span></div>
   </div>
+</div>
+
+<!-- Star popup -->
+<div class="star-popup" id="starPopup">
+  <div id="starText">You've just earned +1 star! ⭐</div>
+  <div style="text-align:right;margin-top:6px"><button id="closeStar" class="ghost">Close</button></div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { 
-  getAuth, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
-  onAuthStateChanged, signOut 
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { 
-  getFirestore, doc, setDoc, getDoc, collection, query, orderBy, addDoc, onSnapshot, serverTimestamp 
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, addDoc, orderBy, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* Firebase config */
+// ✅ Your Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyCBnnH-pQJ0l0zOvrmoSVp37EQWubJQDxc",
   authDomain: "chatroomdb4xixi.firebaseapp.com",
@@ -135,123 +130,114 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const sendLoginLinkBtn = document.getElementById("sendLoginLinkBtn");
-const authMsg = document.getElementById("authMsg");
-const chatInput = document.getElementById("messageInput");
-const sendBtn = document.getElementById("sendBtn");
-const messagesEl = document.getElementById("messages");
-const profileNameEl = document.getElementById("profileName");
-const starCountEl = document.getElementById("starCount");
-const dollarCountEl = document.getElementById("dollarCount");
+/* --- Auth --- */
+const signupBtn = document.getElementById("signupBtn");
+const signinBtn = document.getElementById("signinBtn");
+const signoutBtn = document.getElementById("signoutBtn");
 
 let currentUser = null;
-const STAR_VALUE = 0.00054;
-let userColors = {};
 
-function getRandomColor(){
-  const colors = ['#FF6B6B','#FFD93D','#6BCB77','#4D96FF','#FF6EC7','#FF8C42'];
-  return colors[Math.floor(Math.random()*colors.length)];
-}
-
-/* Send login link */
-sendLoginLinkBtn.addEventListener("click", async ()=>{
-  const email = document.getElementById("authEmail").value.trim();
+signupBtn.addEventListener("click", async () => {
+  const email = document.getElementById("authEmail").value;
+  const pass = document.getElementById("authPassword").value;
   const chatId = document.getElementById("authUsername").value.trim();
-  if(!chatId || chatId.length<4) return authMsg.textContent="Chat ID must be at least 4 characters";
 
-  const userDocRef = doc(db,"users",chatId);
-  const userSnap = await getDoc(userDocRef);
+  if (!chatId || chatId.length < 4) return alert("Chat ID must be at least 4 characters.");
 
-  if(userSnap.exists() && userSnap.data().email!==email){
-    authMsg.textContent="Sorry, chat ID is already taken";
-    return;
-  }
+  // Check uniqueness
+  const usersRef = collection(db, "users");
+  const q = query(usersRef, where("chatId", "==", chatId));
+  const querySnap = await getDocs(q);
+  if (!querySnap.empty) return alert("Chat ID already exists.");
 
-  try{
-    const actionCodeSettings = {url:window.location.href,handleCodeInApp:true};
-    await sendSignInLinkToEmail(auth,email,actionCodeSettings);
-    window.localStorage.setItem('emailForSignIn', email);
-    window.localStorage.setItem('chatIdForSignIn', chatId);
-    authMsg.textContent="Login link sent! Check your email.";
-  }catch(err){ authMsg.textContent=err.message; }
+  const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+  const user = userCredential.user;
+  await setDoc(doc(db, "users", user.uid), { chatId, email, stars: 0 });
 });
 
-/* Complete login via link */
-if(isSignInWithEmailLink(auth,window.location.href)){
-  let email = window.localStorage.getItem('emailForSignIn');
-  let chatId = window.localStorage.getItem('chatIdForSignIn');
-  if(!email){
-    email = prompt("Enter your email to complete login");
-  }
-  signInWithEmailLink(auth,email,window.location.href)
-  .then(async result=>{
-    const user = result.user;
-    await setDoc(doc(db,"users",chatId),{email,chatId,stars:0}, {merge:true});
-    window.localStorage.removeItem('emailForSignIn');
-    window.localStorage.removeItem('chatIdForSignIn');
-  }).catch(err=>console.error(err));
-}
+signinBtn.addEventListener("click", async () => {
+  const email = document.getElementById("authEmail").value;
+  const pass = document.getElementById("authPassword").value;
+  await signInWithEmailAndPassword(auth, email, pass);
+});
 
-/* Auth state */
-onAuthStateChanged(auth, async user=>{
-  if(user){
-    currentUser = user;
-    let userDoc = await getDoc(doc(db,"users",user.email.replace(/\W/g,"_")));
-    const chatId = userDoc.exists()?userDoc.data().chatId:user.email.split('@')[0];
-    profileNameEl.textContent = chatId;
+signoutBtn.addEventListener("click", async () => {
+  await signOut(auth);
+});
 
-    /* Load stars & $ */
-    let stars = userDoc.exists()?userDoc.data().stars:0;
-    starCountEl.textContent = stars;
-    dollarCountEl.textContent = (stars*STAR_VALUE).toFixed(5);
+onAuthStateChanged(auth, async user => {
+  const profileName = document.getElementById("profileName");
+  const uidEl = document.getElementById("uid");
+  if (user) {
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+    const chatId = userDoc.exists() ? userDoc.data().chatId : "Unknown";
+    currentUser = { uid: user.uid, chatId };
+    profileName.textContent = chatId;
+    uidEl.textContent = user.uid;
+    document.getElementById("authBox").style.display = "none";
+    signoutBtn.style.display = "block";
 
-    // Load messages
-    const messagesRef = collection(db,"messages");
-    const messagesQuery = query(messagesRef,orderBy("timestamp","asc"));
-    onSnapshot(messagesQuery,snap=>{
-      messagesEl.innerHTML="";
-      snap.forEach(doc=>{
+    // Load messages in real-time
+    const messagesRef = collection(db, "messages");
+    const messagesQuery = query(messagesRef, orderBy("timestamp", "asc"));
+    onSnapshot(messagesQuery, snap => {
+      const messagesEl = document.getElementById("messages");
+      messagesEl.innerHTML = "";
+      snap.forEach(doc => {
         const data = doc.data();
-        if(!userColors[data.chatId]) userColors[data.chatId]=getRandomColor();
         const msgEl = document.createElement("div");
         msgEl.classList.add("msg");
-        msgEl.style.color=userColors[data.chatId];
-        msgEl.innerHTML=`<span class="meta">${data.chatId}:</span> ${data.text}`;
+        if (data.chatId === currentUser.chatId) msgEl.classList.add("me");
+        msgEl.innerHTML = `<div class="meta">${data.chatId}</div><div class="content">${data.text}</div>`;
         messagesEl.appendChild(msgEl);
       });
       messagesEl.scrollTop = messagesEl.scrollHeight;
     });
-  }else{
-    currentUser=null;
-    profileNameEl.textContent="Guest";
+
+  } else {
+    currentUser = null;
+    profileName.textContent = "Guest";
+    uidEl.textContent = "—";
+    document.getElementById("authBox").style.display = "block";
+    signoutBtn.style.display = "none";
   }
 });
 
-/* Send message */
-async function sendMessage(){
-  const text = chatInput.value.trim();
-  if(!text || !currentUser) return;
-  const chatId = profileNameEl.textContent;
-  await addDoc(collection(db,"messages"),{
-    chatId,text,timestamp:serverTimestamp()
-  });
-  chatInput.value="";
-}
-sendBtn.addEventListener("click",sendMessage);
-chatInput.addEventListener("keydown",e=>{ if(e.key==="Enter"){e.preventDefault();sendMessage();} });
+/* --- Message system --- */
+const messageInput = document.getElementById("messageInput");
+const sendBtnEl = document.getElementById("sendBtn");
+const messagesEl = document.getElementById("messages");
 
-/* Stars increment */
-setInterval(async ()=>{
-  if(!currentUser) return;
-  const chatId = profileNameEl.textContent;
-  let userDocRef = doc(db,"users",chatId);
-  let userDocSnap = await getDoc(userDocRef);
-  let stars = userDocSnap.exists()?userDocSnap.data().stars:0;
-  stars+=1;
-  await setDoc(userDocRef,{stars},{merge:true});
+sendBtnEl.addEventListener("click", async () => {
+  const text = messageInput.value.trim();
+  if (!text || !currentUser) return;
+
+  await addDoc(collection(db, "messages"), {
+    chatId: currentUser.chatId,
+    text,
+    timestamp: serverTimestamp()
+  });
+  messageInput.value = "";
+});
+
+/* --- Star system --- */
+let stars = 0;
+const starCountEl = document.getElementById("starCount");
+const starPopup = document.getElementById("starPopup");
+const starText = document.getElementById("starText");
+const closeStarBtn = document.getElementById("closeStar");
+
+function showStarPopup() {
+  stars += 1;
   starCountEl.textContent = stars;
-  dollarCountEl.textContent = (stars*STAR_VALUE).toFixed(5);
-},10000);
+  starText.innerHTML = `You've just earned +1 star! ⭐`;
+  starPopup.style.display = "block";
+  setTimeout(() => { starPopup.style.display = "none"; }, 3000);
+}
+closeStarBtn.addEventListener("click", () => { starPopup.style.display = "none"; });
+
+// TEST: every 10 sec
+setInterval(showStarPopup, 10000);
 
 </script>
 </body>
