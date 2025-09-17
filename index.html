@@ -33,17 +33,15 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
   border-radius:8px; background:#000; margin-bottom:6px;
 }
 .msg{
-  padding:6px 10px;
-  border-radius:8px;
+  padding:4px 8px;
+  border-radius:6px;
   background:var(--glass);
-  opacity:0;
-  animation:fadeInUp 0.25s forwards;
   display:flex; align-items:flex-start; gap:6px; flex-wrap:wrap; max-width:90%;
-  color:#fff; /* ensure text is visible */
+  font-size:12px; line-height:1.2; /* smaller font */
+  color:#fff;
   word-break:break-word;
 }
-.msg.me{ margin-left:auto; justify-content:flex-end; }
-.msg .username{ font-weight:700; color:var(--accent); }
+.msg .username{ font-weight:700; }
 .msg .content{ color:#fff; }
 
 /* Send area */
@@ -54,17 +52,14 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
   border-radius:20px;
 }
 .send-area textarea{
-  flex:1;padding:10px 14px;border-radius:999px;
+  flex:1;padding:8px 12px;border-radius:999px;
   border:1px solid rgba(255,255,255,0.1);
   background:#111;color:#fff;font-size:14px;outline:none;transition:0.2s all;
-  resize:none;
-  min-height:40px;
-  max-height:120px;
-  overflow-y:auto;
+  resize:none; min-height:36px; max-height:120px; overflow-y:auto;
 }
 .send-area textarea::placeholder{color:var(--muted);}
 .send-area textarea:focus{border-color:var(--accent);box-shadow:0 0 10px rgba(223,244,31,0.4);}
-.send-area button.btn{padding:8px 14px;border-radius:999px;background:var(--accent);color:#000;cursor:pointer;font-weight:600;transition:0.2s all;}
+.send-area button.btn{padding:6px 12px;border-radius:999px;background:var(--accent);color:#000;cursor:pointer;font-weight:600;transition:0.2s all;}
 .send-area button.btn:hover{filter:brightness(1.1);}
 
 /* Profile + Stars */
@@ -78,8 +73,8 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 @keyframes fadeInUp{to{opacity:1;transform:translateY(0);}}
 @media (max-width:600px){
   .send-area{padding:6px 8px;}
-  .send-area button.btn{padding:6px 12px;font-size:13px;}
-  .send-area textarea{font-size:13px;padding:8px 12px;}
+  .send-area button.btn{padding:6px 10px;font-size:13px;}
+  .send-area textarea{font-size:13px;padding:6px 10px;}
   .brand{font-size:24px;}
   .room-desc{font-size:11px;}
 }
@@ -159,78 +154,82 @@ const messagesEl = document.getElementById("messages");
 let currentUser=null;
 let stars=0;
 
-function showError(msg){ authMsg.textContent=msg; }
+// Random color for username
+let sessionColors = {};
+function getRandomColor() {
+  const colors = ["#DFF41F","#FF6EC7","#1EF4D2","#FF9F1E","#6A5ACD","#FF3D3D","#00FFD4"];
+  return colors[Math.floor(Math.random()*colors.length)];
+}
 
-/* Send login link */
-sendLinkBtn.addEventListener("click", async()=>{
+// Show error
+function showError(msg){ authMsg.textContent = msg; }
+
+// Send login link
+sendLinkBtn.addEventListener("click", async ()=>{
   const email = document.getElementById("authEmail").value.trim();
   const chatId = document.getElementById("authUsername").value.trim();
-  if(!chatId || chatId.length<4) return showError("Chat ID must be at least 4 characters.");
-  if(!email) return showError("Email required.");
+  if(!email || !chatId || chatId.length<4) return showError("Chat ID must be at least 4 characters.");
 
+  // Check if chatId exists with a different email
+  const q = query(collection(db,"users"),where("chatId","==",chatId));
+  const snap = await getDocs(q);
+  if(!snap.empty && snap.docs[0].data().email !== email){
+    return showError("Sorry, chat ID is already taken");
+  }
+
+  const actionCodeSettings = { url: window.location.href, handleCodeInApp:true };
   try{
-    const usersRef = collection(db,"users");
-    const q = query(usersRef,where("chatId","==",chatId));
-    const snap = await getDocs(q);
-    if(!snap.empty && snap.docs[0].data().email!==email){
-      return showError("Sorry, chat ID is already taken.");
-    }
-
-    const actionCodeSettings = { url: window.location.href, handleCodeInApp: true };
     await sendSignInLinkToEmail(auth,email,actionCodeSettings);
-    window.localStorage.setItem("emailForSignIn",email);
-    showError("Login link sent! Check your email.");
+    window.localStorage.setItem('emailForSignIn', email);
+    if(snap.empty){
+      await setDoc(doc(db,"users",email), { chatId, email, stars:0 });
+    }
+    showError("Login link sent! Check your inbox.");
   }catch(err){ showError(err.message); }
 });
 
-/* Sign in with email link */
-if(isSignInWithEmailLink(auth,window.location.href)){
-  let email = window.localStorage.getItem("emailForSignIn") || prompt("Provide your email for confirmation");
-  signInWithEmailLink(auth,email,window.location.href).then(async(userCredential)=>{
-    const user=userCredential.user;
-    const chatId=document.getElementById("authUsername").value.trim();
-    const userDocRef=doc(db,"users",user.uid);
-    const snap=await getDoc(userDocRef);
-    if(!snap.exists()){
-      await setDoc(userDocRef,{chatId,email,stars:0});
-    }
-    window.localStorage.removeItem("emailForSignIn");
-    showError("Signed in!");
-  }).catch(err=>showError(err.message));
+// Handle magic link sign in
+if(isSignInWithEmailLink(auth, window.location.href)){
+  let email = window.localStorage.getItem('emailForSignIn');
+  if(!email){
+    email = prompt('Please provide your email for confirmation');
+  }
+  signInWithEmailLink(auth,email,window.location.href).catch(err=>showError(err.message));
 }
 
-/* Auth state change */
-onAuthStateChanged(auth,async(user)=>{
-  const profileName=document.getElementById("profileName");
-  const uidEl=document.getElementById("uid");
-  const authBox=document.getElementById("authBox");
+// Auth state
+onAuthStateChanged(auth, async user=>{
+  const profileName = document.getElementById("profileName");
+  const uidEl = document.getElementById("uid");
+  const authBox = document.getElementById("authBox");
 
   if(user){
-    const userDocRef=doc(db,"users",user.uid);
-    const snap=await getDoc(userDocRef);
-    if(!snap.exists()) return showError("User record missing");
-    currentUser={uid:user.uid, chatId:snap.data().chatId};
-    stars=snap.data().stars||0;
-    profileName.textContent=currentUser.chatId;
-    uidEl.textContent=currentUser.uid;
-    document.getElementById("starCount").textContent=stars;
+    currentUser=user;
+    const userDoc = await getDoc(doc(db,"users",user.email));
+    const data = userDoc.data();
+    profileName.textContent = data.chatId;
+    uidEl.textContent = user.uid;
+    stars = data.stars || 0;
+    document.getElementById("starCount").textContent = stars;
+
+    if(!sessionColors[data.chatId]) sessionColors[data.chatId] = getRandomColor();
     authBox.style.display="none";
     signoutBtn.style.display="block";
 
-    /* Load messages */
-    const messagesRef=collection(db,"messages");
-    const messagesQuery=query(messagesRef,orderBy("timestamp","asc"));
-    onSnapshot(messagesQuery,(snap)=>{
+    // Listen for messages
+    const messagesRef = collection(db,"messages");
+    const messagesQuery = query(messagesRef,orderBy("timestamp","asc"));
+    onSnapshot(messagesQuery,snap=>{
       messagesEl.innerHTML="";
       snap.forEach(doc=>{
-        const data=doc.data();
-        const msgEl=document.createElement("div");
+        const msg = doc.data();
+        if(!sessionColors[msg.chatId]) sessionColors[msg.chatId] = getRandomColor();
+        const msgEl = document.createElement("div");
         msgEl.classList.add("msg");
-        if(data.chatId===currentUser.chatId) msgEl.classList.add("me");
-        msgEl.innerHTML=`<span class="username">${data.chatId}:</span> <span class="content">${data.text}</span>`;
+        msgEl.innerHTML = `<span class="username" style="color:${sessionColors[msg.chatId]}">${msg.chatId}:</span> <span class="content">${msg.text}</span>`;
         messagesEl.appendChild(msgEl);
       });
-      messagesEl.scrollTop=messagesEl.scrollHeight;
+      messagesEl.scrollTop = messagesEl.scrollHeight;
     });
 
   }else{
@@ -239,52 +238,44 @@ onAuthStateChanged(auth,async(user)=>{
     uidEl.textContent="—";
     authBox.style.display="block";
     signoutBtn.style.display="none";
-    messagesEl.innerHTML="";
   }
 });
 
-/* Sign out */
-signoutBtn.addEventListener("click",async()=>{ try{await signOut(auth);}catch(err){showError(err.message);} });
+// Sign out
+signoutBtn.addEventListener("click",()=>{ signOut(auth); });
 
-/* Send message */
+// Send message
 async function sendMessage(){
   if(!currentUser) return;
-  const text=messageInput.value.trim();
+  const text = messageInput.value.trim();
   if(!text) return;
-  try{
-    await addDoc(collection(db,"messages"),{
-      chatId:currentUser.chatId,
-      text,
-      timestamp:serverTimestamp()
-    });
-    messageInput.value="";
-    messageInput.style.height="auto";
-  }catch(err){ console.error(err); }
+  await addDoc(collection(db,"messages"),{
+    chatId: document.getElementById("authUsername").value.trim(),
+    text,
+    timestamp:serverTimestamp()
+  });
+  messageInput.value="";
 }
 sendBtnEl.addEventListener("click",sendMessage);
-messageInput.addEventListener("keydown",e=>{
-  if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); sendMessage(); }
-});
+messageInput.addEventListener("keydown",e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); sendMessage(); }});
 
-/* Auto resize textarea */
-messageInput.addEventListener("input",()=>{messageInput.style.height="auto";messageInput.style.height=messageInput.scrollHeight+"px";});
+// Stars system
+const starCountEl = document.getElementById("starCount");
+const starPopup = document.getElementById("starPopup");
+const starText = document.getElementById("starText");
+const closeStarBtn = document.getElementById("closeStar");
 
-/* Stars system */
-const starCountEl=document.getElementById("starCount");
-const starPopup=document.getElementById("starPopup");
-const starText=document.getElementById("starText");
-const closeStarBtn=document.getElementById("closeStar");
 function showStarPopup(){
-  if(!currentUser) return;
   stars+=1;
   starCountEl.textContent=stars;
   starText.innerHTML=`You've just earned +1 star! ⭐`;
   starPopup.style.display="block";
-  setDoc(doc(db,"users",currentUser.uid),{stars},{merge:true});
   setTimeout(()=>{starPopup.style.display="none";},3000);
 }
 closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
-setInterval(showStarPopup,10000);
+setInterval(()=>{
+  if(currentUser) showStarPopup();
+},10000);
 
 </script>
 </body>
