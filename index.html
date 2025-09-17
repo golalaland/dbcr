@@ -110,7 +110,7 @@ import {
   getAuth, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, onAuthStateChanged, signOut 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { 
-  getFirestore, doc, setDoc, collection, query, orderBy, serverTimestamp, addDoc, onSnapshot, getDoc 
+  getFirestore, doc, setDoc, collection, query, orderBy, serverTimestamp, addDoc, onSnapshot, getDoc, runTransaction 
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* Firebase config */
@@ -138,24 +138,28 @@ function showError(err){
   authMsg.textContent = err.message || "Something went wrong";
 }
 
-/* SEND MAGIC LINK */
+/* SEND MAGIC LINK WITH UNIQUE CHAT ID CHECK */
 sendLinkBtn.addEventListener("click", async () => {
   const email = document.getElementById("authEmail").value.trim();
   const chatId = document.getElementById("authUsername").value.trim();
-  
+
   if(!email) return alert("Enter your email");
   if(!chatId || chatId.length < 4) return alert("Chat ID must be at least 4 characters.");
 
   try {
-    const actionCodeSettings = {
-      url: window.location.href,
-      handleCodeInApp: true
-    };
+    await runTransaction(db, async (transaction) => {
+      const snap = await getDoc(doc(db,"chatIds",chatId));
+      if(snap.exists()) throw new Error("Chat ID already taken");
+      transaction.set(doc(db,"chatIds",chatId), { reserved:true });
+    });
 
+    const actionCodeSettings = { url: window.location.href, handleCodeInApp: true };
     await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+
     window.localStorage.setItem('chatIdForSignIn', chatId);
     window.localStorage.setItem('emailForSignIn', email);
     alert("Login link sent! Check your email.");
+
   } catch(err) { showError(err); }
 });
 
@@ -167,7 +171,7 @@ if(isSignInWithEmailLink(auth, window.location.href)){
     signInWithEmailLink(auth, email, window.location.href)
       .then(async userCred => {
         const user = userCred.user;
-        const userDocRef = doc(db, "users", user.uid);
+        const userDocRef = doc(db,"users",user.uid);
         const userSnap = await getDoc(userDocRef);
         if(!userSnap.exists()){
           await setDoc(userDocRef, { chatId, email, stars:0 });
@@ -196,7 +200,6 @@ onAuthStateChanged(auth, async user=>{
       authBox.style.display = "none";
       signoutBtn.style.display = "block";
 
-      // Load messages
       const messagesRef = collection(db,"messages");
       const messagesQuery = query(messagesRef,orderBy("timestamp","asc"));
       onSnapshot(messagesQuery,snap=>{
@@ -224,9 +227,7 @@ onAuthStateChanged(auth, async user=>{
 });
 
 /* SIGN OUT */
-signoutBtn.addEventListener("click", async ()=>{
-  try{ await signOut(auth); } catch(err){ showError(err); }
-});
+signoutBtn.addEventListener("click", async ()=>{ try{ await signOut(auth); } catch(err){ showError(err); } });
 
 /* MESSAGES */
 const messageInput = document.getElementById("messageInput");
