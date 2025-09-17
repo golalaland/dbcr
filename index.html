@@ -1,250 +1,111 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-<title>Xixi — Chatroom</title>
-<link rel="icon" href="data:," />
-<style>
-:root{
-  --bg:#000;
-  --card:#111;
-  --muted:#aaa;
-  --accent:#DFF41F;
-  --glass: rgba(255,255,255,0.03);
-  --scrollbar:#222;
-}
-html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;color:#fff;background:var(--bg);}
-.app{display:grid;grid-template-columns:260px 1fr 300px;gap:12px;padding:12px;box-sizing:border-box;height:100%;}
-.panel{background:var(--card);border-radius:12px;padding:12px;box-shadow:0 6px 20px rgba(0,0,0,.6);display:flex;flex-direction:column;}
-#left, #right{gap:12px;}
-.brand{font-weight:700;font-size:18px;color:var(--accent);text-align:center;}
-.small{font-size:12px;color:var(--muted);}
-.rooms{margin-top:8px;display:flex;flex-direction:column;gap:6px;overflow:auto;padding-right:4px;}
-.room-btn{background:transparent;border-radius:8px;border:1px solid rgba(255,255,255,0.05);padding:8px;color:var(--muted);text-align:left;cursor:pointer;}
-.room-btn.active{background:rgba(223,244,31,0.1);color:var(--accent);}
-.controls-row{display:flex;gap:6px;margin-top:8px;}
-input, button, textarea, select{font-family:inherit;}
-input[type="text"], input[type="email"], input[type="password"]{width:100%;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);background:#000;color:#fff;}
-button.btn{background:var(--accent);color:#000;border:0;padding:6px 10px;border-radius:8px;cursor:pointer;}
-button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);color:var(--muted);padding:6px;border-radius:8px;}
-#center{height:100%;display:flex;flex-direction:column;}
-.topbar{display:flex;justify-content:space-between;align-items:center;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.05);}
-#messages{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:6px;border-radius:8px;background:#000;}
-.msg{padding:8px;border-radius:10px;background:var(--glass);max-width:75%;position:relative;opacity:0;animation:fadeInUp 0.25s forwards;}
-.msg.me{margin-left:auto;background:rgba(223,244,31,0.08);}
-.meta{font-size:11px;color:var(--muted);margin-bottom:4px;}
-.content{font-size:13px;color:#fff;white-space:pre-wrap;}
-.reactions{margin-top:4px;display:flex;gap:4px;}
-.react-btn{cursor:pointer;padding:2px 4px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);background:transparent;color:var(--muted);font-size:12px;}
-.send-area{display:flex;gap:6px;padding-top:6px;align-items:center;position:sticky;bottom:0;background:var(--bg);}
-textarea#messageInput{flex:1;min-height:36px;max-height:100px;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);background:#000;color:#fff;resize:none;}
-#right .profile{display:flex;flex-direction:column;gap:4px;}
-.star-svg{margin-left:4px;}
-.star-popup{position:fixed;left:50%;top:18%;transform:translateX(-50%);background:var(--card);padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);display:none;z-index:1000;color:var(--accent);font-size:12px;}
-.msg.selected{outline:2px solid rgba(223,244,31,0.2);}
-@keyframes fadeInUp{to{opacity:1;transform:translateY(0);}}
-@media (max-width:980px){.app{grid-template-columns:1fr;grid-template-rows:auto 1fr auto;}#right{order:3;}}
-</style>
-</head>
-<body>
-<div class="app">
-  <!-- LEFT PANEL -->
-  <div class="panel" id="left">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <div>
-        <div class="brand">乂丨乂丨</div>
-        <div class="small">CHAT. OWN YOUR VIBE.</div>
-      </div>
-      <div id="userBadge"></div>
-    </div>
+<!-- Keep all your original HTML/CSS exactly as-is -->
 
-    <!-- Auth -->
-    <div id="authBox" style="margin-top:12px">
-      <div id="authForm">
-        <input type="email" id="authEmail" placeholder="Email" />
-        <input type="password" id="authPassword" placeholder="Password" style="margin-top:6px"/>
-        <div class="controls-row">
-          <button id="signinBtn" class="btn">Sign in</button>
-          <button id="signupBtn" class="ghost">Sign up</button>
-        </div>
-        <div style="margin-top:6px">
-          <button id="signoutBtn" class="ghost" style="display:none">Sign out</button>
-        </div>
-      </div>
-      <div id="authMsg" class="small-ghost" style="margin-top:6px"></div>
-      <div style="margin-top:6px">
-        <input type="text" id="chatIdInput" placeholder="Chat ID" />
-      </div>
-    </div>
-
-    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.05);margin:10px 0"/>
-
-    <div class="rooms">
-      <button class="room-btn active">Money Talk 💸</button>
-      <div class="small">Talk money and hustle</div>
-      <button class="room-btn">For Love of Music ♫</button>
-      <div class="small">Discuss tracks, beats, vibes</div>
-      <button class="room-btn">AirDrops 🪂</button>
-      <div class="small">NFTs, airdrops, and crypto</div>
-      <button class="room-btn">Chill Zone ⛵️</button>
-      <div class="small">Relax and vibe together</div>
-      <button class="room-btn">Health is Wealth 🏥</button>
-      <div class="small">Fitness, diet, wellness</div>
-      <button class="room-btn">Peace is Priceless 🧘🏽</button>
-      <div class="small">Meditation & lifestyle</div>
-      <button class="room-btn">Movie Hut 🎬</button>
-      <div class="small">Film talk and reviews</div>
-    </div>
-
-    <div style="margin-top:auto" class="small">Embed via &lt;iframe&gt; or deploy to GitHub / Firebase.</div>
-  </div>
-
-  <!-- CENTER PANEL -->
-  <div class="panel" id="center">
-    <div class="topbar">
-      <div>
-        <div id="roomTitle" style="font-weight:700">Money Talk 💸</div>
-        <div id="roomSub" class="small" style="margin-top:2px">Talk money and hustle</div>
-      </div>
-      <div class="small" id="userInfoTop"></div>
-    </div>
-
-    <div id="messages"></div>
-
-    <div class="send-area">
-      <textarea id="messageInput" placeholder="Write your message..."></textarea>
-      <button id="sendBtn" class="btn">Send</button>
-    </div>
-  </div>
-
-  <!-- RIGHT PANEL -->
-  <div class="panel" id="right">
-    <div class="profile">
-      <div><strong id="profileName">Guest</strong></div>
-      <div class="small">Stars: <span id="starCount">0</span><span class="star-svg">⭐</span></div>
-      <div class="small">Chat ID: <span id="chatIdDisplay">—</span></div>
-    </div>
-    <div style="margin-top:auto" class="small">Stay active 5 mins → earn Stars saved to your account.</div>
-  </div>
-</div>
-
-<!-- Star popup -->
-<div class="star-popup" id="starPopup">
-  <div id="starText">You've just earned +1 star!</div>
-  <div style="text-align:right;margin-top:6px"><button id="closeStar" class="ghost">Close</button></div>
-</div>
-
-<!-- Firebase SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+/* --- Firebase config --- */
 const firebaseConfig = {
-  apiKey: "AIzaSyBLSE-HNfQ1ZOxUWBn8CK3VXyy6818cYe0",
-  authDomain: "dbcr-c8e5c.firebaseapp.com",
-  projectId: "dbcr-c8e5c",
-  storageBucket: "dbcr-c8e5c.firebasestorage.app",
-  messagingSenderId: "611977707226",
-  appId: "1:611977707226:web:2927ceda326371f241afe3"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_BUCKET",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-let currentUser = null;
-let currentRoomId = "moneyTalk";
-
-// DOM Elements
-const authEmail = document.getElementById("authEmail");
-const authPassword = document.getElementById("authPassword");
-const signinBtn = document.getElementById("signinBtn");
+/* --- Auth --- */
 const signupBtn = document.getElementById("signupBtn");
+const signinBtn = document.getElementById("signinBtn");
 const signoutBtn = document.getElementById("signoutBtn");
-const chatIdInput = document.getElementById("chatIdInput");
 const profileName = document.getElementById("profileName");
-const chatIdDisplay = document.getElementById("chatIdDisplay");
-const messagesEl = document.getElementById("messages");
-const messageInput = document.getElementById("messageInput");
-const sendBtn = document.getElementById("sendBtn");
-const starCountEl = document.getElementById("starCount");
-const starPopup = document.getElementById("starPopup");
-const starText = document.getElementById("starText");
-const closeStar = document.getElementById("closeStar");
+const uidEl = document.getElementById("uid");
 
-// Auth
+let currentUser = null;
+
 signupBtn.addEventListener("click", async () => {
-  if(!authEmail.value || !authPassword.value) return alert("Enter email and password");
-  try {
-    const userCredential = await createUserWithEmailAndPassword(auth, authEmail.value, authPassword.value);
-    currentUser = { uid: userCredential.user.uid, chatId: chatIdInput.value || "Guest" };
-    profileName.textContent = currentUser.chatId;
-    chatIdDisplay.textContent = currentUser.chatId;
-  } catch(e){console.error(e);}
+  const email = document.getElementById("authEmail").value;
+  const pass = document.getElementById("authPassword").value;
+  const chatId = document.getElementById("authUsername").value.trim();
+  if(!chatId) return alert("Enter Chat ID");
+  const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+  currentUser = { uid: userCredential.user.uid, chatId };
+  profileName.textContent = chatId;
+  uidEl.textContent = userCredential.user.uid;
+  document.getElementById("authBox").style.display = "none";
+  signoutBtn.style.display = "block";
+  // Save Chat ID to Firestore
+  await addDoc(collection(db, "users"), { uid: userCredential.user.uid, chatId });
 });
 
 signinBtn.addEventListener("click", async () => {
-  try {
-    const userCredential = await signInWithEmailAndPassword(auth, authEmail.value, authPassword.value);
-    currentUser = { uid: userCredential.user.uid, chatId: chatIdInput.value || "Guest" };
-    profileName.textContent = currentUser.chatId;
-    chatIdDisplay.textContent = currentUser.chatId;
-  } catch(e){console.error(e);}
+  const email = document.getElementById("authEmail").value;
+  const pass = document.getElementById("authPassword").value;
+  const userCredential = await signInWithEmailAndPassword(auth, email, pass);
+  const chatId = document.getElementById("authUsername").value.trim() || email.split("@")[0];
+  currentUser = { uid: userCredential.user.uid, chatId };
+  profileName.textContent = chatId;
+  uidEl.textContent = userCredential.user.uid;
+  document.getElementById("authBox").style.display = "none";
+  signoutBtn.style.display = "block";
 });
 
-signoutBtn.addEventListener("click", async () => {
+signoutBtn.addEventListener("click", async ()=>{
   await signOut(auth);
-  currentUser = null;
-  profileName.textContent = "Guest";
-  chatIdDisplay.textContent = "—";
 });
 
-// Listen for auth state
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, (user)=>{
   if(user){
-    signoutBtn.style.display = "inline-block";
-    signinBtn.style.display = "none";
-    signupBtn.style.display = "none";
+    currentUser = { uid: user.uid, chatId: document.getElementById("authUsername").value.trim() || "Guest" };
+    profileName.textContent = currentUser.chatId;
+    uidEl.textContent = user.uid;
+    document.getElementById("authBox").style.display = "none";
+    signoutBtn.style.display = "block";
   } else {
+    currentUser = null;
+    profileName.textContent = "Guest";
+    uidEl.textContent = "—";
+    document.getElementById("authBox").style.display = "block";
     signoutBtn.style.display = "none";
-    signinBtn.style.display = "inline-block";
-    signupBtn.style.display = "inline-block";
   }
 });
 
-// Firestore
-async function sendMessage(text){
-  if(!currentUser) return;
-  addMessage(currentUser.chatId, text);
-  try{
-    await addDoc(collection(db, "rooms", currentRoomId, "messages"), {
-      chatId: currentUser.chatId,
-      text: text,
-      timestamp: serverTimestamp()
-    });
-  }catch(e){console.error(e);}
-}
-
-sendBtn.addEventListener("click", ()=>{
-  const text = messageInput.value.trim();
-  if(!text) return;
-  sendMessage(text);
-  messageInput.value = "";
-});
+/* --- Firestore Chat --- */
+const messageInput = document.getElementById("messageInput");
+const sendBtnEl = document.getElementById("sendBtn");
+const messagesEl = document.getElementById("messages");
+const ROOM_ID = "moneyTalk"; // single room as agreed
 
 function addMessage(chatId, text){
   const msgEl = document.createElement("div");
-  msgEl.className = "msg" + (currentUser && chatId === currentUser.chatId ? " me":"");
+  msgEl.classList.add("msg");
+  if(currentUser && chatId === currentUser.chatId) msgEl.classList.add("me");
   msgEl.innerHTML = `<div class="meta">${chatId}</div><div class="content">${text}</div>`;
   messagesEl.appendChild(msgEl);
   messagesEl.scrollTop = messagesEl.scrollHeight;
-  msgEl.style.opacity = "1";
 }
 
-// Listen for real-time messages
-const messagesQuery = query(collection(db, "rooms", currentRoomId, "messages"), orderBy("timestamp","asc"));
+sendBtnEl.addEventListener("click", async ()=>{
+  const text = messageInput.value.trim();
+  if(!text || !currentUser) return;
+  // Add locally
+  addMessage(currentUser.chatId, text);
+  messageInput.value = "";
+  // Save to Firestore
+  await addDoc(collection(db, "rooms", ROOM_ID, "messages"), {
+    chatId: currentUser.chatId,
+    text,
+    timestamp: serverTimestamp()
+  });
+});
+
+// Real-time listener
+const messagesQuery = query(collection(db, "rooms", ROOM_ID, "messages"), orderBy("timestamp"));
 onSnapshot(messagesQuery, snapshot=>{
   messagesEl.innerHTML = "";
   snapshot.forEach(doc=>{
@@ -253,19 +114,21 @@ onSnapshot(messagesQuery, snapshot=>{
   });
 });
 
-// Star system (for testing every 10 seconds)
+/* --- Stars (test every 10 sec) --- */
 let stars = 0;
-setInterval(()=>{
-  if(currentUser){
-    stars += 1;
-    starCountEl.textContent = stars;
-    starPopup.style.display = "block";
-    starText.textContent = "You've just earned +1 ⭐!";
-  }
-},10000);
+const starCountEl = document.getElementById("starCount");
+const starPopup = document.getElementById("starPopup");
+const starText = document.getElementById("starText");
+const closeStarBtn = document.getElementById("closeStar");
 
-closeStar.addEventListener("click", ()=>{starPopup.style.display="none";});
+function showStarPopup(){
+  stars += 1;
+  starCountEl.textContent = stars;
+  starText.innerHTML = `You've just earned +1 star! ⭐`;
+  starPopup.style.display = "block";
+  setTimeout(()=>{starPopup.style.display="none";},3000);
+}
+closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
+setInterval(showStarPopup,10000);
 
 </script>
-</body>
-</html>
