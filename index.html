@@ -70,7 +70,7 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
   <div class="brand">乂丨乂丨</div>
   <div class="room-desc">Money Talk 💸 — Chat. Own your vibe.</div>
 
-  <!-- Auth -->
+  <!-- Auth: original design preserved -->
   <div id="authBox">
     <input type="text" id="authUsername" placeholder="Chat ID" />
     <input type="email" id="authEmail" placeholder="Email" />
@@ -85,12 +85,15 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 
   <!-- Center panel: Video + Chat -->
   <div id="center">
+    <!-- Video Embed -->
     <div id="videoContainer">
       <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="Video" allowfullscreen></iframe>
     </div>
 
+    <!-- Messages -->
     <div id="messages"></div>
 
+    <!-- Twitch-style send area -->
     <div class="send-area">
       <input type="text" id="messageInput" placeholder="Type your message..." />
       <button id="sendBtn" class="btn">Send</button>
@@ -114,9 +117,9 @@ html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Robot
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, doc, setDoc, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* --- Firebase config --- */
+/* Firebase config */
 const firebaseConfig = {
   apiKey: "AIzaSyBLSE-HNfQ1ZOxUWBn8CK3VXyy6818cYe0",
   authDomain: "dbcr-c8e5c.firebaseapp.com",
@@ -145,62 +148,67 @@ signupBtn.addEventListener("click", async () => {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
     const user = userCredential.user;
-    await setDoc(doc(db, "users", user.uid), { chatId });
+    await setDoc(doc(db, "users", user.uid), {
+      chatId,
+      email,
+      stars: 0,
+      lastActive: serverTimestamp()
+    });
   } catch(e){console.error(e); alert(e.message);}
 });
 
 signinBtn.addEventListener("click", async () => {
   const email = document.getElementById("authEmail").value;
   const pass = document.getElementById("authPassword").value;
-  try { await signInWithEmailAndPassword(auth, email, pass); }
-  catch(e){console.error(e); alert(e.message);}
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, pass);
+    const user = userCredential.user;
+    const userSnap = await getDoc(doc(db, "users", user.uid));
+    if(userSnap.exists()){
+      currentUser = userSnap.data();
+      currentUser.uid = user.uid;
+      profileName.textContent = currentUser.chatId;
+      uid.textContent = currentUser.uid;
+      starCountEl.textContent = currentUser.stars || 0;
+      document.getElementById("authBox").style.display = "none";
+      signoutBtn.style.display = "block";
+    }
+  } catch(e){console.error(e); alert(e.message);}
 });
 
 signoutBtn.addEventListener("click", async ()=>{
   await signOut(auth);
 });
 
-/* --- On Auth State Change --- */
-onAuthStateChanged(auth, async user => {
-  const profileName = document.getElementById("profileName");
-  const uid = document.getElementById("uid");
-  const authBox = document.getElementById("authBox");
-  if(user){
-    currentUser = { uid: user.uid, chatId: "" };
-    const userDoc = await (await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js')).getDoc(doc(db,"users",user.uid));
-    if(userDoc.exists()) currentUser.chatId = userDoc.data().chatId;
-    else currentUser.chatId = user.email.split("@")[0];
-    profileName.textContent = currentUser.chatId;
-    uid.textContent = user.uid;
-    authBox.style.display = "none";
-    signoutBtn.style.display = "block";
-  } else {
+onAuthStateChanged(auth, user => {
+  if(!user){
     currentUser = null;
     profileName.textContent = "Guest";
     uid.textContent = "—";
-    authBox.style.display = "block";
+    starCountEl.textContent = 0;
+    document.getElementById("authBox").style.display = "block";
     signoutBtn.style.display = "none";
   }
 });
 
-/* --- Firestore real-time messages --- */
-const messagesEl = document.getElementById("messages");
+/* --- Message system --- */
 const messageInput = document.getElementById("messageInput");
 const sendBtnEl = document.getElementById("sendBtn");
+const messagesEl = document.getElementById("messages");
 
-function addMessage(msg){
+function addMessage(data){
   const msgEl = document.createElement("div");
   msgEl.classList.add("msg");
-  if(currentUser && msg.chatId === currentUser.chatId) msgEl.classList.add("me");
-  msgEl.innerHTML = `<div class="meta">${msg.chatId}</div><div class="content">${msg.text}</div>`;
+  if(currentUser && data.chatId === currentUser.chatId) msgEl.classList.add("me");
+  msgEl.innerHTML = `<div class="meta">${data.chatId}</div><div class="content">${data.text}</div>`;
   messagesEl.appendChild(msgEl);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-/* --- Send Message --- */
 sendBtnEl.addEventListener("click", async ()=>{
   const text = messageInput.value.trim();
   if(!text || !currentUser) return;
+
   await addDoc(collection(db,"messages"),{
     chatId: currentUser.chatId,
     text,
@@ -209,7 +217,7 @@ sendBtnEl.addEventListener("click", async ()=>{
   messageInput.value = "";
 });
 
-/* --- Real-time listener --- */
+/* Real-time listener */
 const messagesQuery = query(collection(db,"messages"), orderBy("timestamp"));
 onSnapshot(messagesQuery, snapshot=>{
   messagesEl.innerHTML = "";
@@ -226,10 +234,18 @@ const starText = document.getElementById("starText");
 const closeStarBtn = document.getElementById("closeStar");
 
 function showStarPopup(){
-  stars += 1;
-  starCountEl.textContent = stars;
+  if(!currentUser) return;
+  currentUser.stars = (currentUser.stars || 0) + 1;
+  starCountEl.textContent = currentUser.stars;
   starText.innerHTML = `You've just earned +1 star! ⭐`;
   starPopup.style.display = "block";
+
+  // Save stars to Firestore
+  setDoc(doc(db, "users", currentUser.uid), {
+    ...currentUser,
+    lastActive: serverTimestamp()
+  });
+
   setTimeout(()=>{starPopup.style.display="none";},3000);
 }
 closeStarBtn.addEventListener("click",()=>{starPopup.style.display="none";});
