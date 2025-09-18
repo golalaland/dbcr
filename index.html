@@ -1,224 +1,251 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Xixi Stream + Chat</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: black;
-      color: white;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-    }
-
-    #video-column {
-      position: sticky;
-      top: 0;
-      z-index: 1000;
-      background: black;
-    }
-
-    #stream-video {
-      width: 100%;
-      height: 250px;
-      display: block;
-    }
-
-    #chat-column {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-      padding: 10px;
-    }
-
-    #chat-messages {
-      flex: 1;
-      overflow-y: auto;
-    }
-
-    .chat-message {
-      margin-bottom: 6px;
-      text-align: left;
-      display: flex;
-      align-items: baseline;
-    }
-
-    .chat-username {
-      font-weight: bold;
-      font-size: 15px;
-      margin-right: 4px;
-    }
-
-    .chat-text {
-      font-size: 13px;
-    }
-
-    #chat-input {
-      display: flex;
-      border-top: 1px solid #333;
-      padding: 6px;
-    }
-
-    #messageInput {
-      flex: 1;
-      padding: 6px;
-      font-size: 14px;
-      border: none;
-      border-radius: 4px;
-    }
-
-    #sendButton {
-      margin-left: 6px;
-      padding: 6px 12px;
-      background: #39ff14;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      color: black;
-      font-weight: bold;
-    }
-
-    #top-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 6px 10px;
-      background: #111;
-    }
-
-    #star-count {
-      font-size: 14px;
-    }
-
-    #redeemButton {
-      padding: 5px 10px;
-      background: #39ff14;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      color: black;
-      font-weight: bold;
-      text-decoration: none; /* ✅ remove underline */
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Xixi — Money Talk 💸</title>
+<link rel="icon" href="data:," />
+<style>
+:root{
+  --bg:#000;
+  --card:#111;
+  --muted:#aaa;
+  --accent:#DFF41F;
+  --glass: rgba(255,255,255,0.03);
+}
+html,body{height:100%;margin:0;font-family:'XiXi',Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;color:#fff;background:var(--bg);}
+.app{display:flex;flex-direction:column;height:100%;gap:12px;padding:12px;box-sizing:border-box;}
+.brand{font-weight:700;font-size:28px;color:var(--accent);text-align:center;}
+.room-desc{font-size:12px;color:var(--muted);text-align:center;margin-bottom:12px;}
+#authBox{margin-bottom:12px;}
+#authBox input{display:block;width:100%;margin-bottom:6px;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);background:#000;color:#fff;font-size:14px;}
+#authBox .controls-row{display:flex;gap:6px;margin-top:6px;}
+#authBox button.btn{background:var(--accent);color:#000;border:0;padding:6px 10px;border-radius:8px;cursor:pointer;}
+#authBox button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.05);color:var(--muted);padding:6px;border-radius:8px;}
+#center{flex:1;display:flex;flex-direction:column;gap:6px;}
+#videoContainer{width:100%;aspect-ratio:16/9;background:#111;border-radius:12px;overflow:hidden;position:sticky;top:0;z-index:5;}
+#videoContainer iframe{width:100%;height:100%;border:0;border-radius:12px;}
+#messages{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:6px;border-radius:8px;background:#000;margin-bottom:6px;}
+.msg{padding:6px 8px;border-radius:10px;background:var(--glass);max-width:85%;position:relative;display:flex;gap:6px;align-items:center;opacity:0;animation:fadeInUp 0.25s forwards;}
+.msg.me{margin-left:auto;background:rgba(223,244,31,0.08);}
+.msg .meta{font-weight:700;font-size:14px;}  /* bold username */
+.msg .content{font-size:12px;color:#fff;white-space:pre-wrap;}  /* smaller message */
+.send-area{
+  display:flex;align-items:center;gap:6px;
+  background:var(--card);padding:6px 12px;
+  position:sticky;bottom:0;z-index:10;border-top:1px solid rgba(255,255,255,0.05);
+  border-radius:20px;
+}
+.send-area input{
+  flex:1;padding:10px 14px;border-radius:999px;
+  border:1px solid rgba(255,255,255,0.1);
+  background:#111;color:#fff;font-size:14px;outline:none;transition:0.2s all;
+}
+.send-area input::placeholder{color:var(--muted);}
+.send-area input:focus{border-color:var(--accent);box-shadow:0 0 10px rgba(223,244,31,0.4);}
+.send-area button.btn{padding:8px 14px;border-radius:999px;background:var(--accent);color:#000;cursor:pointer;font-weight:600;transition:0.2s all;}
+.send-area button.btn:hover{filter:brightness(1.1);}
+.profile{display:flex;flex-direction:column;gap:4px;margin-top:12px;}
+.profile .small{font-size:12px;color:var(--muted);}
+.star-popup{
+  position:fixed;left:50%;top:18%;transform:translateX(-50%);
+  background:var(--card);padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);
+  display:none;z-index:1000;color:var(--accent);font-size:12px;white-space:nowrap;text-align:center;max-width:90%;
+}
+.redeem-btn{
+  background:var(--accent);color:#000;font-size:11px;
+  padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:600;
+  margin-left:auto;text-decoration:none; /* ✅ removed underline */
+}
+@keyframes fadeInUp{to{opacity:1;transform:translateY(0);}}
+@media (max-width:600px){
+  .send-area{padding:6px 8px;}
+  .send-area button.btn{padding:6px 12px;font-size:13px;}
+  .send-area input{font-size:13px;padding:8px 12px;}
+  .brand{font-size:24px;}
+  .room-desc{font-size:11px;}
+}
+</style>
 </head>
 <body>
-  <!-- VIDEO COLUMN -->
-  <div id="video-column">
-    <iframe id="stream-video" src="https://xixi.live" title="Stream Video" frameborder="0" allowfullscreen></iframe>
+
+<div class="app">
+  <div class="brand">乂丨乂丨</div>
+  <div class="room-desc">Money Talk 💸 — Chat. Own your vibe.</div>
+
+  <!-- Auth -->
+  <div id="authBox">
+    <input type="text" id="authUsername" placeholder="Chat ID" />
+    <input type="email" id="authEmail" placeholder="Email" />
+    <input type="password" id="authPassword" placeholder="Password" />
+    <div class="controls-row">
+      <button id="signinBtn" class="btn">Sign in</button>
+      <button id="signupBtn" class="ghost">Sign up</button>
+      <button id="signoutBtn" class="ghost" style="display:none">Sign out</button>
+    </div>
+    <div id="authMsg" class="small-ghost" style="margin-top:6px"></div>
   </div>
 
-  <!-- TOP BAR -->
-  <div id="top-bar">
-    <div id="star-count">⭐ Stars: 0</div>
-    <button id="redeemButton">Redeem Stars</button>
-  </div>
+  <!-- Center panel: Video + Chat -->
+  <div id="center">
+    <div id="videoContainer">
+      <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="Video" allowfullscreen></iframe>
+    </div>
 
-  <!-- CHAT COLUMN -->
-  <div id="chat-column">
-    <div id="chat-messages"></div>
-    <div id="chat-input">
-      <input id="messageInput" type="text" placeholder="Type a message...">
-      <button id="sendButton">Send</button>
+    <div id="messages"></div>
+
+    <div class="send-area">
+      <input type="text" id="messageInput" placeholder="Type your message..." />
+      <button id="sendBtn" class="btn">Send</button>
     </div>
   </div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  <!-- Profile -->
+  <div class="profile">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <strong id="profileName">Guest</strong>
+        <div class="small">Stars: <span id="starCount">0</span> ⭐</div>
+        <div class="small">UID: <span id="uid">—</span></div>
+      </div>
+      <a href="https://xixi.live" target="_blank" class="redeem-btn">Redeem</a>
+    </div>
+  </div>
+</div>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyCBnnH-pQJ0l0zOvrmoSVp37EQWubJQDxc",
-      authDomain: "chatroomdb4xixi.firebaseapp.com",
-      projectId: "chatroomdb4xixi",
-      storageBucket: "chatroomdb4xixi.firebasestorage.app",
-      messagingSenderId: "221124190278",
-      appId: "1:221124190278:web:bc3d65b548ab961b602a47"
-    };
+<!-- Star popup -->
+<div class="star-popup" id="starPopup">
+  <div id="starText">You've just earned +1 star! ⭐</div>
+  <div style="text-align:right;margin-top:6px"><button id="closeStar" class="ghost">Close</button></div>
+</div>
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, orderBy, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    let currentUser = null;
+// ✅ Firebase Config
+const firebaseConfig = {
+  apiKey: "AIzaSyCBnnH-pQJ0l0zOvrmoSVp37EQWubJQDxc",
+  authDomain: "chatroomdb4xixi.firebaseapp.com",
+  projectId: "chatroomdb4xixi",
+  storageBucket: "chatroomdb4xixi.firebasestorage.app",
+  messagingSenderId: "221124190278",
+  appId: "1:221124190278:web:bc3d65b548ab961b602a47"
+};
 
-    // ✅ Stable random color for session
-    let sessionColor = "#" + Math.floor(Math.random() * 16777215).toString(16);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-    signInAnonymously(auth);
+let currentUser = null;
+const userColors = {}; // store username -> color
 
-    onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        currentUser = user;
-        const userRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(userRef);
-        if (!docSnap.exists()) {
-          await setDoc(userRef, { stars: 0, color: sessionColor });
-          document.getElementById("star-count").textContent = "⭐ Stars: 0";
-        } else {
-          document.getElementById("star-count").textContent = "⭐ Stars: " + docSnap.data().stars;
-          sessionColor = docSnap.data().color || sessionColor;
-        }
-      }
-    });
+function getColorForUser(chatId){
+  if(!userColors[chatId]){
+    const colors = ["#FF6B6B","#6BCB77","#4D96FF","#FFD93D","#B980F0","#FF9F1C"];
+    userColors[chatId] = colors[Math.floor(Math.random()*colors.length)];
+  }
+  return userColors[chatId];
+}
 
-    // ✅ Live chat messages
-    const q = query(collection(db, "messages"), orderBy("timestamp", "asc"));
-    onSnapshot(q, (snapshot) => {
-      const chatMessages = document.getElementById("chat-messages");
-      chatMessages.innerHTML = "";
-      snapshot.forEach((doc) => {
-        const msg = doc.data();
-        const msgDiv = document.createElement("div");
-        msgDiv.classList.add("chat-message");
+// Auth
+document.getElementById("signupBtn").addEventListener("click", async () => {
+  const email = document.getElementById("authEmail").value;
+  const pass = document.getElementById("authPassword").value;
+  const chatId = document.getElementById("authUsername").value.trim();
+  if (!chatId || chatId.length < 4) return alert("Chat ID must be at least 4 characters.");
+  const usersRef = collection(db, "users");
+  const q = query(usersRef, where("chatId", "==", chatId));
+  const querySnap = await getDocs(q);
+  if (!querySnap.empty) return alert("Chat ID already exists.");
+  const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+  await setDoc(doc(db, "users", userCredential.user.uid), { chatId, email, stars: 0 });
+});
 
-        const usernameSpan = document.createElement("span");
-        usernameSpan.classList.add("chat-username");
-        usernameSpan.style.color = msg.color || "#fff";
-        usernameSpan.textContent = msg.username + ":";
+document.getElementById("signinBtn").addEventListener("click", async () => {
+  const email = document.getElementById("authEmail").value;
+  const pass = document.getElementById("authPassword").value;
+  await signInWithEmailAndPassword(auth, email, pass);
+});
 
-        const textSpan = document.createElement("span");
-        textSpan.classList.add("chat-text");
-        textSpan.textContent = " " + msg.text;
+document.getElementById("signoutBtn").addEventListener("click", async () => {
+  await signOut(auth);
+});
 
-        msgDiv.appendChild(usernameSpan);
-        msgDiv.appendChild(textSpan);
-        chatMessages.appendChild(msgDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+onAuthStateChanged(auth, async user => {
+  const profileName = document.getElementById("profileName");
+  const uidEl = document.getElementById("uid");
+  if (user) {
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+    const chatId = userDoc.exists() ? userDoc.data().chatId : "Unknown";
+    let stars = userDoc.exists() ? userDoc.data().stars : 0;
+    currentUser = { uid: user.uid, chatId };
+    profileName.textContent = chatId;
+    uidEl.textContent = user.uid;
+    document.getElementById("authBox").style.display = "none";
+    document.getElementById("signoutBtn").style.display = "block";
+
+    // show stars
+    document.getElementById("starCount").textContent = stars;
+
+    // Load messages
+    const messagesRef = collection(db, "messages");
+    const messagesQuery = query(messagesRef, orderBy("timestamp", "asc"));
+    onSnapshot(messagesQuery, snap => {
+      const messagesEl = document.getElementById("messages");
+      messagesEl.innerHTML = "";
+      snap.forEach(doc => {
+        const data = doc.data();
+        const msgEl = document.createElement("div");
+        msgEl.classList.add("msg");
+        if (data.chatId === currentUser.chatId) msgEl.classList.add("me");
+        const color = getColorForUser(data.chatId);
+        msgEl.innerHTML = `<div class="meta" style="color:${color}">${data.chatId}:</div><div class="content">${data.text}</div>`;
+        messagesEl.appendChild(msgEl);
       });
+      messagesEl.scrollTop = messagesEl.scrollHeight;
     });
+  } else {
+    currentUser = null;
+    profileName.textContent = "Guest";
+    uidEl.textContent = "—";
+    document.getElementById("authBox").style.display = "block";
+    document.getElementById("signoutBtn").style.display = "none";
+  }
+});
 
-    // ✅ Send message + sync stars
-    document.getElementById("sendButton").onclick = async () => {
-      const input = document.getElementById("messageInput");
-      const text = input.value.trim();
-      if (text && currentUser) {
-        const username = "User-" + currentUser.uid.substring(0, 5);
+// Messages
+document.getElementById("sendBtn").addEventListener("click", async () => {
+  const text = document.getElementById("messageInput").value.trim();
+  if (!text || !currentUser) return;
+  await addDoc(collection(db, "messages"), {
+    chatId: currentUser.chatId,
+    text,
+    timestamp: serverTimestamp()
+  });
+  document.getElementById("messageInput").value = "";
+});
 
-        await addDoc(collection(db, "messages"), {
-          text,
-          username,
-          color: sessionColor,
-          timestamp: new Date()
-        });
+// Stars
+const starCountEl = document.getElementById("starCount");
+const starPopup = document.getElementById("starPopup");
+const starText = document.getElementById("starText");
+document.getElementById("closeStar").addEventListener("click", () => { starPopup.style.display = "none"; });
 
-        input.value = "";
-
-        // Update stars
-        const userRef = doc(db, "users", currentUser.uid);
-        const docSnap = await getDoc(userRef);
-        let stars = docSnap.exists() ? docSnap.data().stars : 0;
-        stars++;
-        await updateDoc(userRef, { stars });
-        document.getElementById("star-count").textContent = "⭐ Stars: " + stars;
-      }
-    };
-  </script>
+async function giveStar() {
+  if (!currentUser) return;
+  const userRef = doc(db, "users", currentUser.uid);
+  const userSnap = await getDoc(userRef);
+  let stars = userSnap.exists() ? userSnap.data().stars : 0;
+  stars += 1;
+  await updateDoc(userRef, { stars });
+  starCountEl.textContent = stars;
+  starText.innerHTML = `You've just earned +1 star! ⭐`;
+  starPopup.style.display = "block";
+  setTimeout(() => { starPopup.style.display = "none"; }, 3000);
+}
+setInterval(giveStar, 10000);
+</script>
 </body>
 </html>
