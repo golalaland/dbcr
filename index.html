@@ -1,104 +1,230 @@
-<style>
-  .chat-message {
-    margin-bottom: 6px;
-    text-align: left;
-  }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xixi Chat</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: black;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
 
-  .chat-username {
-    font-weight: bold;
-    font-size: 15px; /* more prominent */
-    margin-right: 4px;
-  }
+    /* Video column */
+    #video-column {
+      position: sticky;
+      top: 0;
+      width: 100%;
+      background: black;
+      z-index: 100;
+    }
 
-  .chat-text {
-    font-size: 13px; /* smaller than username */
-  }
-</style>
+    #stream-video {
+      width: 100%;
+      height: 250px;
+      display: block;
+    }
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-  import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    /* Chat column */
+    #chat-column {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 250px);
+    }
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyCBnnH-pQJ0l0zOvrmoSVp37EQWubJQDxc",
-    authDomain: "chatroomdb4xixi.firebaseapp.com",
-    projectId: "chatroomdb4xixi",
-    storageBucket: "chatroomdb4xixi.firebasestorage.app",
-    messagingSenderId: "221124190278",
-    appId: "1:221124190278:web:bc3d65b548ab961b602a47"
-  };
+    #chat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: #111;
+      font-size: 14px;
+    }
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
+    #star-count {
+      font-weight: bold;
+      color: #39ff14; /* neon green */
+    }
 
-  let currentUser = null;
+    #redeem-btn {
+      background: #39ff14;
+      color: black;
+      border: none;
+      border-radius: 8px;
+      padding: 4px 10px; /* small + neat */
+      font-size: 12px;
+      cursor: pointer;
+    }
 
-  // ✅ Generate one random color per session
-  let sessionColor = "#" + Math.floor(Math.random()*16777215).toString(16);
+    #chat-messages {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+      font-size: 14px;
+    }
 
-  signInAnonymously(auth);
+    .chat-message {
+      margin-bottom: 6px;
+      text-align: left;
+    }
 
-  onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      currentUser = user;
-      const userRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(userRef);
-      if (!docSnap.exists()) {
-        await setDoc(userRef, { stars: 0 });
-      } else {
-        document.getElementById("star-count").textContent = "⭐ Stars: " + docSnap.data().stars;
+    .chat-username {
+      font-weight: bold;
+      font-size: 15px; /* ✅ more prominent */
+      margin-right: 4px;
+    }
+
+    .chat-text {
+      font-size: 13px; /* ✅ slightly smaller */
+    }
+
+    /* Chat input bar */
+    #chat-input {
+      display: flex;
+      padding: 8px;
+      background: #111;
+    }
+
+    #messageInput {
+      flex: 1;
+      padding: 10px;
+      border-radius: 6px;
+      border: none;
+      outline: none;
+    }
+
+    #sendButton {
+      margin-left: 8px;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      background: #39ff14;
+      color: black;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <!-- VIDEO COLUMN -->
+  <div id="video-column">
+    <iframe id="stream-video" src="https://xixi.live" title="Stream Video" frameborder="0" allowfullscreen></iframe>
+  </div>
+
+  <!-- CHAT COLUMN -->
+  <div id="chat-column">
+    <div id="chat-header">
+      <span id="star-count">⭐ Stars: 0</span>
+      <button id="redeem-btn">Redeem</button>
+    </div>
+
+    <div id="chat-messages"></div>
+
+    <div id="chat-input">
+      <input type="text" id="messageInput" placeholder="Type a message..." />
+      <button id="sendButton">Send</button>
+    </div>
+  </div>
+
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    // Firebase Config
+    const firebaseConfig = {
+      apiKey: "AIzaSyCBnnH-pQJ0l0zOvrmoSVp37EQWubJQDxc",
+      authDomain: "chatroomdb4xixi.firebaseapp.com",
+      projectId: "chatroomdb4xixi",
+      storageBucket: "chatroomdb4xixi.firebasestorage.app",
+      messagingSenderId: "221124190278",
+      appId: "1:221124190278:web:bc3d65b548ab961b602a47"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUser = null;
+
+    // ✅ One random color per session
+    let sessionColor = "#" + Math.floor(Math.random()*16777215).toString(16);
+
+    // Sign in anonymously
+    signInAnonymously(auth);
+
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        currentUser = user;
+        const userRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(userRef);
+        if (!docSnap.exists()) {
+          await setDoc(userRef, { stars: 0 });
+        } else {
+          document.getElementById("star-count").textContent = "⭐ Stars: " + docSnap.data().stars;
+        }
       }
-    }
-  });
-
-  // Listen for chat messages
-  const q = query(collection(db, "messages"), orderBy("timestamp", "asc"));
-  onSnapshot(q, (snapshot) => {
-    const chatMessages = document.getElementById("chat-messages");
-    chatMessages.innerHTML = "";
-    snapshot.forEach((doc) => {
-      const msg = doc.data();
-      const msgDiv = document.createElement("div");
-      msgDiv.classList.add("chat-message");
-
-      const usernameSpan = document.createElement("span");
-      usernameSpan.classList.add("chat-username");
-      usernameSpan.style.color = msg.color || "#fff";
-      usernameSpan.textContent = msg.username + ":";
-
-      const textSpan = document.createElement("span");
-      textSpan.classList.add("chat-text");
-      textSpan.textContent = " " + msg.text;
-
-      msgDiv.appendChild(usernameSpan);
-      msgDiv.appendChild(textSpan);
-      chatMessages.appendChild(msgDiv);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
     });
-  });
 
-  // Send message
-  document.getElementById("sendButton").onclick = async () => {
-    const input = document.getElementById("messageInput");
-    const text = input.value.trim();
-    if (text && currentUser) {
-      await addDoc(collection(db, "messages"), {
-        text,
-        username: "User-" + currentUser.uid.substring(0, 5),
-        color: sessionColor, // ✅ fixed per session
-        timestamp: new Date()
+    // Listen for messages
+    const q = query(collection(db, "messages"), orderBy("timestamp", "asc"));
+    onSnapshot(q, (snapshot) => {
+      const chatMessages = document.getElementById("chat-messages");
+      chatMessages.innerHTML = "";
+      snapshot.forEach((doc) => {
+        const msg = doc.data();
+        const msgDiv = document.createElement("div");
+        msgDiv.classList.add("chat-message");
+
+        const usernameSpan = document.createElement("span");
+        usernameSpan.classList.add("chat-username");
+        usernameSpan.style.color = msg.color || "#fff";
+        usernameSpan.textContent = msg.username + ":";
+
+        const textSpan = document.createElement("span");
+        textSpan.classList.add("chat-text");
+        textSpan.textContent = " " + msg.text;
+
+        msgDiv.appendChild(usernameSpan);
+        msgDiv.appendChild(textSpan);
+        chatMessages.appendChild(msgDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
       });
-      input.value = "";
+    });
 
-      // Update stars
-      const userRef = doc(db, "users", currentUser.uid);
-      const docSnap = await getDoc(userRef);
-      let stars = docSnap.exists() ? docSnap.data().stars : 0;
-      stars++;
-      await updateDoc(userRef, { stars });
-      document.getElementById("star-count").textContent = "⭐ Stars: " + stars;
-    }
-  };
-</script>
+    // Send message
+    document.getElementById("sendButton").onclick = async () => {
+      const input = document.getElementById("messageInput");
+      const text = input.value.trim();
+      if (text && currentUser) {
+        await addDoc(collection(db, "messages"), {
+          text,
+          username: "User-" + currentUser.uid.substring(0, 5),
+          color: sessionColor, // ✅ fixed color per session
+          timestamp: new Date()
+        });
+        input.value = "";
+
+        // Update user stars
+        const userRef = doc(db, "users", currentUser.uid);
+        const docSnap = await getDoc(userRef);
+        let stars = docSnap.exists() ? docSnap.data().stars : 0;
+        stars++;
+        await updateDoc(userRef, { stars });
+        document.getElementById("star-count").textContent = "⭐ Stars: " + stars;
+      }
+    };
+
+    // Redeem button (placeholder)
+    document.getElementById("redeem-btn").onclick = () => {
+      alert("Redeem stars coming soon at xixi.live!");
+    };
+  </script>
+</body>
+</html>
